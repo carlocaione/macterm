@@ -5,7 +5,7 @@
 </h1>
 
 <p align="center">
-  A feature-rich macOS terminal built to be pleasant, native, and lightweight. Built on libghostty.
+  A feature-rich macOS terminal built to be pleasant, native, and lightweight.
 </p>
 
 <p align="center">
