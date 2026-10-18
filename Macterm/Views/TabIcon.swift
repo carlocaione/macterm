@@ -177,6 +177,7 @@ extension AgentIcon {
         case .gemini: Color(red: 0x42 / 255, green: 0x85 / 255, blue: 0xF4 / 255) // Google blue
         case .copilot: Color(red: 0x89 / 255, green: 0x57 / 255, blue: 0xE5 / 255) // GitHub purple
         case .antigravity: Color(red: 0x31 / 255, green: 0x86 / 255, blue: 0xFF / 255) // Google Antigravity blue
+        case .omp: Color(red: 0x93 / 255, green: 0x62 / 255, blue: 0xF4 / 255) // omp violet
         case .opencode,
              .cursor,
              .grok,
