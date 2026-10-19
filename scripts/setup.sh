@@ -48,6 +48,11 @@ XCFRAMEWORK_DIR="GhosttyKit.xcframework"
 # start_selection, move_selection:<motion>, extend_selection:<motion>,
 # collapse_selection, flip_selection, select_line, clear_selection. No C API
 # change. The fork's build now runs `zig build test` on the patches first.
+# build-2026-10-19-c767c9f: upstream c7cbc9bfd (the sync had stopped at
+# 2026-10-13, thdxg/ghostty#28) with the same 13 patches. It brings in upstream
+# ff779564c6: an ED2 (Ctrl+L) at a prompt with blank rows below it moves the
+# screen into the scrollback again, not only when the prompt is on the last
+# row. C API: ghostty_surface_paste_text is new. Nothing else changed.
 # build-2026-10-19-2684fe9: + downstream patch 0014 (thdxg/ghostty#29): the
 # `selection_cursor:on|off` action draws the cursor on the head of the
 # selection, for copy mode. No C API change.
