@@ -564,6 +564,21 @@ final class GhosttyTerminalNSView: NSView {
         self?.sendBindingAction(action)
     }
 
+    /// The popover of Explain Output (`explainOutput`). Made on first use.
+    var explainPopover: ExplainPopover {
+        if let madeExplainPopover { return madeExplainPopover }
+        let made = ExplainPopover()
+        madeExplainPopover = made
+        return made
+    }
+
+    /// The popover if Explain ever ran in this pane: what the key path reads,
+    /// so a keystroke never makes one.
+    private(set) var madeExplainPopover: ExplainPopover?
+    /// Where the last right click landed, in view coordinates: the menu's
+    /// Explain item points its popover there.
+    private var contextMenuPoint: NSPoint?
+
     init(
         paneID: UUID,
         workingDirectory: String,
@@ -1240,6 +1255,8 @@ final class GhosttyTerminalNSView: NSView {
             return
         }
         if processExited { exitAcknowledgedByKey = true }
+        // Escape closes the Explain popover, which never keeps key.
+        if madeExplainPopover?.closesOnEscape(event) == true { return }
         // A Return or Escape the password bubble answers is consumed here and
         // never reaches libghostty. Everything else is reported to the
         // password monitor at the point it is actually sent, below, as the
@@ -1769,6 +1786,7 @@ final class GhosttyTerminalNSView: NSView {
         default:
             return nil
         }
+        contextMenuPoint = convert(event.locationInWindow, from: nil)
         return contextMenu()
     }
 
@@ -1788,6 +1806,16 @@ final class GhosttyTerminalNSView: NSView {
         paste.target = self
         paste.isEnabled = GhosttyCallbacks.hasPasteboardContent()
         menu.addItem(paste)
+        if OnDeviceModel.availability == .available {
+            let hasSelection = surface.map(ghostty_surface_has_selection) ?? false
+            let explain = NSMenuItem(
+                title: hasSelection ? String(localized: "Explain Selection") : String(localized: "Explain Output"),
+                action: #selector(handleExplain),
+                keyEquivalent: ""
+            )
+            explain.target = self
+            menu.addItem(explain)
+        }
         menu.addItem(.separator())
         addScrollNavigationItems(menu)
         menu.addItem(.separator())
@@ -1816,6 +1844,11 @@ final class GhosttyTerminalNSView: NSView {
     @objc
     private func handleZoom() {
         onZoomRequest?()
+    }
+
+    @objc
+    private func handleExplain() {
+        explainOutput(at: contextMenuPoint)
     }
 
     private func addScrollNavigationItems(_ menu: NSMenu) {
@@ -2351,8 +2384,14 @@ extension GhosttyTerminalNSView {
     /// core declines the read. This is the same API ghostty's own app uses for
     /// its cached screen/visible contents.
     func readText(scrollback: Bool) -> String? {
+        readText(area: scrollback ? GHOSTTY_POINT_SCREEN : GHOSTTY_POINT_VIEWPORT)
+    }
+
+    /// Read the cell text of a whole area: `GHOSTTY_POINT_VIEWPORT` (what is
+    /// on screen), `GHOSTTY_POINT_ACTIVE` (the bottom screen, wherever the
+    /// user has scrolled) or `GHOSTTY_POINT_SCREEN` (with the scrollback).
+    func readText(area tag: ghostty_point_tag_e) -> String? {
         guard let surface else { return nil }
-        let tag = scrollback ? GHOSTTY_POINT_SCREEN : GHOSTTY_POINT_VIEWPORT
         let sel = ghostty_selection_s(
             top_left: ghostty_point_s(tag: tag, coord: GHOSTTY_POINT_COORD_TOP_LEFT, x: 0, y: 0),
             bottom_right: ghostty_point_s(tag: tag, coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT, x: 0, y: 0),
