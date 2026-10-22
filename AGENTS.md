@@ -916,12 +916,14 @@ Conventions:
 Every other macOS job runs on `xcode-27` (macOS 27). `Test / Smoke` starts the Release build on `macos-26` and `macos-15`, isolated, and requires these things:
 
 - The control socket answers `status`. A newer SDK or Swift runtime can break the launch on an older system without a compile error.
+- The app is a terminal. A new tab and a split each get a shell through the bundled zmx, and a command that the script types there shows its output in `pane dump`.
 - On macOS 26, the app paints its adaptive icon by itself, so the private renderer still works there. This is the only test of it on macOS 26. If the icon is not there, the script runs the helper by hand so that the helper's own error is in the log.
 - Before macOS 26, the app does not try.
+- No crash report from the app, zmx or the icon helper appears during the run.
 
 `Release Build`, `Smoke (macos-26)` and `Smoke (macos-15)` are required checks on main, next to `Format`, `Lint`, `Unit` and `End-to-end`. **The Smoke checks are two jobs, not a matrix.** A matrix job that its `if:` skips reports its unexpanded name (`Smoke (${{ matrix.runner }})`). A required check with the expanded name then never reports, and a pull request that changes no Swift can never merge.
 
-The CLI takes `--socket` after the subcommand (`macterm status --socket <path>`).
+The script stops only the process that it started, and it kills its own zmx sessions. On a developer Mac it still reads and writes the real defaults domain of the build, because cfprefsd ignores `HOME`. The CLI takes `--socket` after the subcommand (`macterm status --socket <path>`).
 
 ### Benchmarks
 
