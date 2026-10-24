@@ -13,13 +13,16 @@
       "layers" : [
         {
           "fill" : {
-            "solid" : "srgb:0.80392,0.81176,0.81961,1.00000"
+            "linear-gradient" : [
+              "srgb:0.87945,0.87945,0.87945,1.00000",
+              "srgb:0.40000,0.40000,0.40392,1.00000"
+            ]
           },
           "glass" : true,
           "hidden" : false,
           "image-name" : "frame-silver.png",
           "name" : "frame-silver",
-          "opacity" : 0.9,
+          "opacity" : 1,
           "position" : {
             "scale" : 0.8620689655172414,
             "translation-in-points" : [
@@ -49,7 +52,7 @@
       },
       "specular" : "inside",
       "translucency" : {
-        "enabled" : true,
+        "enabled" : false,
         "value" : 0.5
       }
     },
@@ -59,7 +62,10 @@
       "layers" : [
         {
           "fill" : {
-            "solid" : "srgb:0.06667,0.07059,0.07843,1.00000"
+            "linear-gradient" : [
+              "srgb:0.28000,0.28000,0.28000,1.00000",
+              "srgb:0.04500,0.04500,0.04500,1.00000"
+            ]
           },
           "hidden" : false,
           "image-name" : "frame-dark.png",
@@ -94,7 +100,7 @@
       },
       "specular" : "inside",
       "translucency" : {
-        "enabled" : true,
+        "enabled" : false,
         "value" : 0.5
       }
     },
@@ -121,7 +127,10 @@
         },
         {
           "fill" : {
-            "solid" : "srgb:0.57255,0.58235,0.63529,1.00000"
+            "linear-gradient" : [
+              "srgb:0.87945,0.87945,0.87945,1.00000",
+              "srgb:0.40000,0.40000,0.40392,1.00000"
+            ]
           },
           "glass" : true,
           "hidden" : false,
@@ -148,13 +157,13 @@
         ]
       },
       "refractivity" : {
-        "depth" : 0.1205859375,
+        "depth" : 0.06,
         "enabled" : true,
         "strength" : 0.370234375
       },
       "shadow" : {
         "kind" : "neutral",
-        "opacity" : 1.29
+        "opacity" : 2
       },
       "specular" : "inside",
       "translucency" : {
@@ -166,6 +175,23 @@
       "blur-material" : null,
       "hidden" : false,
       "layers" : [
+        {
+          "fill" : {
+            "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
+          },
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "cross-shade.png",
+          "name" : "cross-shade",
+          "opacity" : 0.9,
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        },
         {
           "fill" : {
             "solid" : "srgb:0.84706,0.81569,0.81569,1.00000"
@@ -181,7 +207,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         },
         {
           "fill" : {
@@ -198,7 +224,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         },
         {
           "fill" : {
@@ -215,7 +241,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         },
         {
           "fill" : {
@@ -232,7 +258,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         },
         {
           "fill" : {
@@ -249,7 +275,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         },
         {
           "fill" : {
@@ -266,7 +292,7 @@
               0
             ]
           },
-          "opacity" : 0.75
+          "opacity" : 0.5
         }
       ],
       "lighting" : "combined",
@@ -284,7 +310,7 @@
       },
       "specular" : false,
       "translucency" : {
-        "enabled" : true,
+        "enabled" : false,
         "value" : 0.8
       },
       "opacity" : 1

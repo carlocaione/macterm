@@ -25,8 +25,9 @@ enum AdaptiveIcon {
         var backgroundTop: Color
         var backgroundBottom: Color
         /// Bottom to top, one for each group: the characters, the glass pane,
-        /// the dark ring, and the silver frame.
-        var layers: [Color]
+        /// the dark ring, and the silver frame. Nil keeps the group's bundled
+        /// fills.
+        var layers: [Color?]
         /// The layers with a color of their own: the characters' mesh copies
         /// and the cross.
         var accents: [AdaptiveIconRequest.Accent]
@@ -37,14 +38,22 @@ enum AdaptiveIcon {
     /// reverse of `layers` in `icon.json`.
     static let crossGroup = 1
     static let crossElement = 0
-    /// The cross is a gray halfway from palette 8 to palette 7.
-    static let crossMix = 0.5
+    /// The cross is the silver frame's gradient, top to bottom, in every
+    /// theme, so it reads as part of the frame. The frame keeps its bundled
+    /// fill, but the cross shares its group with the panes, which take the
+    /// theme's screen, so the cross takes the gradient as an accent.
+    static let crossTop = Color(red: 0.87945, green: 0.87945, blue: 0.87945)
+    static let crossBottom = Color(red: 0.40000, green: 0.40000, blue: 0.40392)
     /// The characters' group (the bottom one), and the palette entry of each
     /// mesh copy of the characters by its place in that group: top-left red,
     /// top-right yellow, left magenta, right green, bottom-left cyan. The
     /// characters themselves (element 0) are blue, palette 4, so the bottom
     /// right stays blue.
     static let charactersGroup = 0
+    /// The cross's shade: the top layer of the characters' group, black in
+    /// every theme, as a shadow is.
+    static let crossShadeElement = 6
+    static let crossShade = Color(red: 0, green: 0, blue: 0)
     static let characterBase = 4
     static let characterMesh: [(element: Int, palette: Int)] = [(1, 1), (2, 3), (3, 5), (4, 2), (5, 6)]
 
@@ -60,14 +69,9 @@ enum AdaptiveIcon {
     /// still the gray its lid comes from. Gruvbox's palette 0 is the
     /// background itself, so its lid comes from the next gray.
     static let lidMinimumStep = 0.05
-    /// The frames keep the bundled icon's colors in every theme: the silver
-    /// frame and the dark ring of `AppIcon.icon`. Only the characters and the
-    /// screen follow the theme.
-    static let silverFrame = Color(red: 0.80392, green: 0.81176, blue: 0.81961)
-    static let darkRing = Color(red: 0.06667, green: 0.07059, blue: 0.07843)
-
-    /// The icon's colors. The frames keep the bundled colors (`silverFrame`,
-    /// `darkRing`). The cross is palette 7 mixed `crossMix` toward palette 8.
+    /// The icon's colors. The frames keep their bundled fills in every theme:
+    /// Ghostty's gradients, from `AppIcon.icon`. The cross is the silver
+    /// frame's gradient (`crossTop`, `crossBottom`).
     /// The characters are a mesh gradient of the theme's ANSI colors
     /// (`characterBase`, `characterMesh`). The screen is the theme's lid.
     ///
@@ -80,8 +84,8 @@ enum AdaptiveIcon {
     /// the background, it is palette 8, and the mix comes near Gruvbox's own
     /// `bg1`.
     ///
-    /// In eyesclosed, the theme the icon was drawn in, this picks `#9295A2`
-    /// for the cross and the lid for the screen, and eyesclosed's own ANSI
+    /// In eyesclosed, the theme the icon was drawn in, this picks the lid
+    /// for the screen, and eyesclosed's own ANSI
     /// colors for the characters: the bundled icon's own fills. Nil when the
     /// theme has no gray that differs from the background.
     static func paint(for theme: ThemeColors) -> Paint? {
@@ -98,9 +102,10 @@ enum AdaptiveIcon {
             backgroundBottom: screen,
             // The glass pane is the screen's own color, so that only its
             // glass shows.
-            layers: [theme.palette[characterBase], screen, darkRing, silverFrame],
+            layers: [theme.palette[characterBase], screen, nil, nil],
             accents: characterMesh.map { .init(group: charactersGroup, element: $0.element, color: theme.palette[$0.palette]) }
-                + [.init(group: crossGroup, element: crossElement, color: mix(theme.palette[7], into: theme.palette[8], amount: crossMix))]
+                + [.init(group: crossGroup, element: crossElement, color: crossTop, bottom: crossBottom)]
+                + [.init(group: charactersGroup, element: crossShadeElement, color: crossShade)]
         )
     }
 

@@ -87,11 +87,11 @@ func color(_ text: String) -> CGColor {
 
 let icon = try JSONDecoder().decode(IconFile.self, from: Data(contentsOf: iconURL.appendingPathComponent("icon.json")))
 
-/// The layers of the app icon that the page leaves out: the cross and the
-/// characters' mesh copies. Each group keeps at least one layer, so the copy
+/// The layers of the app icon that the page leaves out: the cross, its shade
+/// and the characters' mesh copies. Each group keeps at least one layer, so the copy
 /// has the app icon's groups, as the helper requires.
 func leftOut(_ name: String) -> Bool {
-    name == "cross" || name.hasPrefix("ascii-")
+    name.hasPrefix("cross") || name.hasPrefix("ascii-")
 }
 /// The app icon's background: one flat color.
 guard let solidFill = icon.fill.solid else { fail("expected a solid background in icon.json") }
@@ -187,11 +187,18 @@ func drawCharacters(in context: CGContext, color: CGColor) {
                 kCTFontAttributeName as NSAttributedString.Key: characterFont,
                 kCTForegroundColorAttributeName as NSAttributedString.Key: color,
             ]))
-            // CoreText draws y up: flip around the baseline.
+            // CoreText draws y up: flip around the baseline. Each character's
+            // ink is centered in its cell, as in the app icon, so the rows
+            // and the columns line up.
             context.saveGState()
             context.translateBy(x: page.minX + Double(column) * cellWidth, y: top + Characters.cellHeight * 0.8)
             context.scaleBy(x: 1, y: -1)
             context.textPosition = .zero
+            let ink = CTLineGetImageBounds(line, context)
+            context.textPosition = CGPoint(
+                x: cellWidth / Characters.spacing / 2 - ink.midX,
+                y: Characters.cellHeight * 0.28 - ink.midY
+            )
             CTLineDraw(line, context)
             context.restoreGState()
         }
@@ -310,9 +317,12 @@ func renderGlassIcon() -> CGImage {
         "backgroundTop": requestColor(background),
         "backgroundBottom": requestColor(background),
         // Bottom to top, as `AdaptiveIconRequest.layers`: the reverse of
-        // `groups`. Each group takes the fill of the first layer it keeps.
-        "layers": icon.groups.reversed().map { group in
-            requestColor(color(group.layers.first { !leftOut($0.name) }!.fill.solid!))
+        // `groups`. Each group takes the fill of the first layer it keeps,
+        // or keeps its own fills when that fill is not a solid color (the
+        // frames' gradients).
+        "layers": icon.groups.reversed().map { group -> Any in
+            guard let solid = group.layers.first(where: { !leftOut($0.name) })!.fill.solid else { return NSNull() }
+            return requestColor(color(solid))
         },
         "pixels": renderPixels,
     ]

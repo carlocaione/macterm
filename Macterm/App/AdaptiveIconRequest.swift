@@ -18,11 +18,14 @@ struct AdaptiveIconRequest: Codable, Equatable, Hashable {
     }
 
     /// One layer's fill: `element` counts the layers of group `group` in
-    /// the order IconRendering keeps them, as `group` counts `layers`.
+    /// the order IconRendering keeps them, as `group` counts `layers`. With
+    /// `bottom`, the fill is a gradient from `color` at the top of the layer
+    /// to `bottom` at its bottom.
     struct Accent: Codable, Equatable, Hashable {
         var group: Int
         var element: Int
         var color: Color
+        var bottom: Color?
     }
 
     /// An sRGB color, each component 0…1.
@@ -45,8 +48,9 @@ struct AdaptiveIconRequest: Codable, Equatable, Hashable {
     /// `groups` array in `AppIcon.icon/icon.json`. The helper refuses a
     /// request whose count differs from the icon's, so an icon redesign that
     /// adds or removes a group falls back to the bundled icon instead of
-    /// painting the wrong layers.
-    var layers: [Color]
+    /// painting the wrong layers. Nil keeps the group's bundled fills, such
+    /// as the frames' gradients, which are the same in every theme.
+    var layers: [Color?]
     /// Fills for single layers inside a group, applied after `layers`: a
     /// layer that keeps a color of its own in every theme, such as the
     /// blush in the characters. Nil when every layer takes its group's fill.
