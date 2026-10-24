@@ -30,7 +30,7 @@
 ![Macterm's vertical project sidebar beside an editor pane and a shell pane](./assets/hero.png)
 
 <p align="center">
-  <a href="https://macterm.thdxg.dev/#features"><b>Watch it work →</b></a>
+  <a href="https://macterm.thdxg.dev/#features"><b>Watch demos →</b></a>
 </p>
 
 > [!NOTE]
