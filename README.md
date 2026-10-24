@@ -90,6 +90,16 @@ A few Macterm defaults are different from the Ghostty defaults: theme, font size
 
 Macterm has its own settings for window opacity, sidebar behavior, quick terminal size and keymaps. Open them with **Macterm → Settings**. The [configuration docs](https://macterm.thdxg.dev/docs/configuration) give the full order of precedence and the few window keys that Macterm overrides.
 
+## Extensions
+
+An extension streamlines your workflows for Git, Docker, Kubernetes, SSH, coding agents and more. Currently, it adds screens to the command palette ([example](extensions/git/README.md)). More capabilities are planned on the roadmap.
+
+**To install:** open **Settings → Extensions**, find the extension and click **Install**. Its palettes appear at once in the **Palettes** section of the command palette (<kbd>⌘P</kbd>).
+
+**To create your own:** make a folder in `~/.config/macterm/extensions/` with an `extension.yaml` file and a `palettes/` folder of YAML files. See the [extension docs](https://macterm.thdxg.dev/docs/extensions) for more detail.
+
+**To contribute:** Open a PR to add your extension folder to [`extensions/`](extensions/).
+
 ## Cookbook
 
 The community shares workflows and recipes: layouts, keybinds and scripts that people run with Macterm. For example:
