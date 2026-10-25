@@ -76,8 +76,8 @@ struct ZmxSocketBudgetTests {
         // The derived (non-ZMX_DIR) paths must match zmx's own resolver, which
         // trims a trailing slash before appending — otherwise kill and the
         // wrapped shell land on different socket dirs.
-        #expect(ZmxSocketBudget.socketDir(env: ["XDG_RUNTIME_DIR": "/run/user/501/"]) == "/run/user/501/zmx")
-        #expect(ZmxSocketBudget.socketDir(env: ["TMPDIR": "/var/tmp/"]) == "/var/tmp/zmx-\(getuid())")
+        #expect(ZmxSocketBudget.socketDir(env: ["XDG_RUNTIME_DIR": "/run/user/501/"]) == "/run/user/501/zmx-off")
+        #expect(ZmxSocketBudget.socketDir(env: ["TMPDIR": "/var/tmp/"]) == "/var/tmp/zmx-off-\(getuid())")
     }
 
     @Test

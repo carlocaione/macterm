@@ -604,13 +604,17 @@ enum ZmxSocketBudget {
     /// Resolved zmx socket dir: `ZMX_DIR`, then `XDG_RUNTIME_DIR`/zmx, then
     /// `TMPDIR`/zmx-<uid>, then `/tmp/zmx-<uid>`. Mirrors zmx's own resolver
     /// (incl. trailing-slash trim) so kill and the wrapped shell can't diverge.
+    /// MactermOff: each derived directory ends in `zmx-off`. Macterm's orphan
+    /// sweep kills every `macterm-*` session with no client that it did not
+    /// create, so the fork keeps its sessions out of Macterm's directory. Every
+    /// zmx process gets the directory as `ZMX_DIR`, so zmx never derives it.
     /// `env` is injectable for deterministic tests.
     static func socketDir(env: [String: String] = ProcessInfo.processInfo.environment) -> String {
         if let custom = env["ZMX_DIR"], !custom.isEmpty { return custom }
         let uid = getuid()
-        if let xdg = env["XDG_RUNTIME_DIR"], !xdg.isEmpty { return "\(trimTrailingSlash(xdg))/zmx" }
-        if let tmp = env["TMPDIR"], !tmp.isEmpty { return "\(trimTrailingSlash(tmp))/zmx-\(uid)" }
-        return "/tmp/zmx-\(uid)"
+        if let xdg = env["XDG_RUNTIME_DIR"], !xdg.isEmpty { return "\(trimTrailingSlash(xdg))/zmx-off" }
+        if let tmp = env["TMPDIR"], !tmp.isEmpty { return "\(trimTrailingSlash(tmp))/zmx-off-\(uid)" }
+        return "/tmp/zmx-off-\(uid)"
     }
 
     private static func trimTrailingSlash(_ value: String) -> String {

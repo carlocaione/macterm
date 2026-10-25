@@ -6,7 +6,7 @@ LAST=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --release) BUNDLE_ID="com.thdxg.macterm" ;;
+    --release) BUNDLE_ID="com.carlocaione.mactermoff" ;;
     --last) LAST="$2"; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac

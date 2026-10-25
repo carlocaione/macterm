@@ -108,7 +108,7 @@ struct MactermConfigFileTests {
     func default_url_is_the_config_directory_file() {
         let url = MactermConfigFile.defaultURL()
         #expect(url.lastPathComponent == "config.ghostty")
-        #expect(url.deletingLastPathComponent().path.hasSuffix("/.config/macterm"))
+        #expect(url.deletingLastPathComponent().path.hasSuffix("/.config/mactermoff"))
         #expect(url.deletingLastPathComponent().standardizedFileURL
             == ProjectFileStore.defaultConfigDirectory().standardizedFileURL)
     }

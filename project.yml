@@ -88,8 +88,8 @@ targets:
         type: file
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.thdxg.macterm
-        PRODUCT_NAME: Macterm
+        PRODUCT_BUNDLE_IDENTIFIER: com.carlocaione.mactermoff
+        PRODUCT_NAME: MactermOff
         # Pinned so the Swift module stays `Macterm` even where PRODUCT_NAME
         # doesn't (Debug builds the bundle as "Macterm Debug.app"). Without
         # this the module would sanitize to `Macterm_Debug` and every
@@ -140,7 +140,7 @@ targets:
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
         # Display name (menu bar / Finder "Get Info") — wired into
         # Info.plist's CFBundleName and CFBundleDisplayName.
-        PRODUCT_DISPLAY_NAME: Macterm
+        PRODUCT_DISPLAY_NAME: MactermOff
       configs:
         Debug:
           # Distinct bundle ID + display name so the debug app coexists with a
@@ -311,7 +311,7 @@ targets:
         Debug:
           TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Macterm Debug.app/Contents/MacOS/Macterm Debug"
         Release:
-          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Macterm.app/Contents/MacOS/Macterm"
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/MactermOff.app/Contents/MacOS/MactermOff"
 
 schemes:
   Macterm:

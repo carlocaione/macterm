@@ -48,13 +48,15 @@ struct ProjectFileStore {
         defaultConfigDirectory().appendingPathComponent("projects", isDirectory: true)
     }
 
+    /// MactermOff: `~/.config/mactermoff`, not `~/.config/macterm`. Macterm
+    /// and the fork each rewrite `pinned.yaml` and `widgets.yaml` on their own.
     /// `~/.config/macterm`: the directory of every file the user edits by
     /// hand — `config.ghostty` (`MactermConfigFile`), `pinned.yaml`,
     /// `widgets.yaml`, `projects/` and `extensions/`. Resolved the same
     /// `$HOME`-first way as `defaultDirectory`, for the same reason.
     nonisolated static func defaultConfigDirectory() -> URL {
         URL(fileURLWithPath: ProjectPath.currentHome, isDirectory: true)
-            .appendingPathComponent(".config/macterm", isDirectory: true)
+            .appendingPathComponent(".config/mactermoff", isDirectory: true)
     }
 
     // MARK: - Scan / match

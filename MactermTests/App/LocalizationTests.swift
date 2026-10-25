@@ -127,7 +127,7 @@ struct LocalizationTests {
         let item = try #require(services.first?["NSMenuItem"] as? [String: String])
         let title = try #require(item["default"])
         let catalog = try Catalog("ServicesMenu")
-        for displayName in ["Macterm", "Macterm Debug"] {
+        for displayName in ["MactermOff", "Macterm Debug"] {
             let key = title.replacingOccurrences(of: "$(PRODUCT_DISPLAY_NAME)", with: displayName)
             #expect(catalog.strings[key] != nil, "no entry for \"\(key)\"")
         }

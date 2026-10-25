@@ -1,5 +1,7 @@
 # Macterm Codebase Guide
 
+> **MactermOff fork:** on every `off/*` branch, read `fork/AGENTS.md` first. Its rules replace the rules of this file where the two disagree.
+
 A macOS terminal emulator built with SwiftUI and libghostty. It has a project-based sidebar, split panes, persistent zmx sessions, remote (ssh) projects, a quick-terminal overlay, desktop widgets and a control CLI. Since #353, it also has any number of windows on one shared model.
 
 This file is the map. It says what exists, how the parts fit together, and which rules we learned the hard way. Each rule has no backstory. The reason for a rule is in three places. The first is the doc comment on the symbol that the rule names. The second is the PR that introduced the rule. The third is the git history of this file (the revision from before 2026-09 has the full narratives). When you change a rule, change its doc comment too.

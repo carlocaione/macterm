@@ -84,15 +84,15 @@ xcodebuild \
 # `method` value is unstable across Xcode releases (Apple renamed the macOS
 # export methods in Xcode 16, breaking the old `mac-application` value — the
 # failure that motivated this). A direct copy has no version-sensitive tokens.
-ARCHIVED_APP="$ARCHIVE_PATH/Products/Applications/Macterm.app"
+ARCHIVED_APP="$ARCHIVE_PATH/Products/Applications/MactermOff.app"
 if [[ ! -d "$ARCHIVED_APP" ]]; then
   echo "ERROR: $ARCHIVED_APP is not in the archive" >&2
   exit 1
 fi
 mkdir -p "$EXPORT_PATH"
-ditto "$ARCHIVED_APP" "$EXPORT_PATH/Macterm.app"
+ditto "$ARCHIVED_APP" "$EXPORT_PATH/MactermOff.app"
 
-APP_BUNDLE="$EXPORT_PATH/Macterm.app"
+APP_BUNDLE="$EXPORT_PATH/MactermOff.app"
 # Sanity-check the copy is a valid, signed bundle before building a DMG from it.
 if ! codesign --verify --deep --strict "$APP_BUNDLE" 2>/dev/null; then
   echo "ERROR: the exported $APP_BUNDLE failed the code-signature check" >&2
@@ -118,8 +118,8 @@ if [[ -n "$CODESIGN_IDENTITY" ]] && grep -q "Signature=adhoc" <<<"$ZMX_SIGNATURE
   echo "ERROR: $ZMX_BINARY has an ad-hoc signature, but MACTERM_CODESIGN_IDENTITY is set" >&2
   exit 1
 fi
-if ! grep -q "^Identifier=com.thdxg.macterm$" <<<"$ZMX_SIGNATURE"; then
-  echo "ERROR: $ZMX_BINARY is not signed as com.thdxg.macterm. Pane programs would ask for permission as a second app" >&2
+if ! grep -q "^Identifier=com.carlocaione.mactermoff$" <<<"$ZMX_SIGNATURE"; then
+  echo "ERROR: $ZMX_BINARY is not signed as com.carlocaione.mactermoff. Pane programs would ask for permission as a second app" >&2
   exit 1
 fi
 # The adaptive icon's renderer is copied into Contents/Helpers with the

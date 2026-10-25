@@ -48,6 +48,30 @@
           }
         }
       }
+    },
+    "New MactermOff Project Here" : {
+      "comment" : "Finder → Services: the item that makes a project from the selected folder. The name is the display name of the build.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New MactermOff Project Here"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여기에서 새로운 MactermOff 프로젝트"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此处新建 MactermOff 项目"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
