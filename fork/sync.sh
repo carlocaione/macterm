@@ -33,7 +33,7 @@ Options of promote:
 
 Environment:
   OFF_UPSTREAM     The upstream ref (default: origin/main).
-  OFF_SYNC_DIR     The sync worktree (default: macterm-off-sync next to the repository).
+  OFF_SYNC_DIR     The sync worktree (default: macterm-off-sync.noindex next to the repository).
   OFF_PUSH_URL     Where promote pushes (default: git@github.com:carlocaione/macterm.git).
   OFF_CLAUDE_MODEL, OFF_CODEX_MODEL   The model of each agent (default: its own).
 EOF
@@ -49,7 +49,7 @@ init() {
   FORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   GIT_COMMON="$(git -C "$FORK_DIR" rev-parse --path-format=absolute --git-common-dir)"
   STATE_DIR="$GIT_COMMON/off-sync"
-  SYNC_DIR="${OFF_SYNC_DIR:-$(dirname "$(dirname "$GIT_COMMON")")/macterm-off-sync}"
+  SYNC_DIR="${OFF_SYNC_DIR:-$(dirname "$(dirname "$GIT_COMMON")")/macterm-off-sync.noindex}"
   UPSTREAM="${OFF_UPSTREAM:-origin/main}"
   PUSH_URL="${OFF_PUSH_URL:-git@github.com:carlocaione/macterm.git}"
   # mise refuses a mise.toml that it does not trust. This trusts the sync

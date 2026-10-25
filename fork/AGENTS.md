@@ -48,7 +48,7 @@ Rules:
 `fork/sync.sh sync` moves the fork to the newest upstream `main`. Nothing that you use changes until you run `promote`.
 
 1. Fetch upstream. Save the fork's remote branch tips, for the lease of `promote`.
-2. Rebase `off/base`, then each feature, onto upstream `main`, as `off/next/base` and `off/next/feat/<name>`. All of this happens in the sync worktree (`../macterm-off-sync`), not in your checkout.
+2. Rebase `off/base`, then each feature, onto upstream `main`, as `off/next/base` and `off/next/feat/<name>`. All of this happens in the sync worktree (`../macterm-off-sync.noindex`), not in your checkout. Spotlight does not index a folder whose name ends in `.noindex`, so the "Macterm Debug" app that the gate builds there does not show in Spotlight. The unit tests and the e2e tests still write upstream's Debug preferences (`com.thdxg.macterm.debug`) and `~/Library/Application Support/Macterm Debug`.
 3. When a rebase stops on a conflict, an agent resolves it. It keeps upstream's change and applies the intent of the fork commit on top. The script stages the files and continues. Git's `rerere` replays a resolution that it saw before. After the rebase, the agent updates the feature's description, because the description is a later commit and is not there during the rebase.
 4. A feature whose code is all upstream now (only its `fork/` file is left) is **retired**: it is not in the integration, and `promote` deletes its branch.
 5. Each branch must pass the gate (`fork/gate.sh`): setup, identity (`off/base` only), format, lint, unit tests, strings. When a step fails, an agent fixes the branch, and the gate runs again (`--attempts`). A branch that still fails is left out, and the sync continues with the others.
