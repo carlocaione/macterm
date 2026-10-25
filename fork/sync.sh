@@ -669,11 +669,50 @@ write_report() {
 # and macOS keeps traces of it in ~/Library. A sync removes the traces that
 # it made, and keeps the ones that were there before it (your own Debug use).
 DEBUG_DOMAIN=com.thdxg.macterm.debug
+NOTIFY_DIR="$HOME/Library/Group Containers/group.com.apple.usernoted"
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 debug_traces() {
   printf '%s\n' "$HOME/Library/Application Support/Macterm Debug" "$HOME/Library/Caches/$DEBUG_DOMAIN" \
     "$HOME/Library/HTTPStorages/$DEBUG_DOMAIN" "$HOME/Library/Saved Application State/$DEBUG_DOMAIN.savedState"
+}
+
+# The Debug app registers with the notification system each time that it
+# runs (System Settings → Notifications lists it): a row in usernoted's
+# database and an entry, with one record for each build, in its settings.
+debug_notifications_present() {
+  if [[ $(sqlite3 -readonly "file:$NOTIFY_DIR/db2/db?mode=ro" \
+    "select count(*) from app where identifier = '$DEBUG_DOMAIN';" 2>/dev/null) =~ ^[1-9] ]]; then
+    return 0
+  fi
+  defaults export "$NOTIFY_DIR/Library/Preferences/group.com.apple.usernoted" - 2>/dev/null |
+    grep -qF "<string>$DEBUG_DOMAIN</string>"
+}
+
+# Remove the Debug app from the notification settings (through cfprefsd, so
+# that no cache writes it back) and from the database, then restart usernoted
+# so that it reads both again. launchd starts it again at once.
+forget_debug_notifications() {
+  local prefs="$NOTIFY_DIR/Library/Preferences/group.com.apple.usernoted" tmp
+  tmp="$(mktemp -d)"
+  if defaults export "$prefs" "$tmp/prefs.plist" 2>/dev/null &&
+    python3 - "$tmp/prefs.plist" "$DEBUG_DOMAIN" <<'PY'
+import plistlib, sys
+path, bundle = sys.argv[1], sys.argv[2]
+d = plistlib.load(open(path, "rb"))
+apps = d.get("apps", [])
+kept = [a for a in apps if a.get("bundle-id") != bundle]
+if len(kept) == len(apps):
+    sys.exit(1)
+d["apps"] = kept
+plistlib.dump(d, open(path, "wb"), fmt=plistlib.FMT_BINARY)
+PY
+  then
+    defaults import "$prefs" "$tmp/prefs.plist"
+  fi
+  sqlite3 "$NOTIFY_DIR/db2/db" "delete from app where identifier = '$DEBUG_DOMAIN';" 2>/dev/null || true
+  killall usernoted 2>/dev/null || true
+  rm -rf "$tmp"
 }
 
 note_debug_traces() {
@@ -683,6 +722,7 @@ note_debug_traces() {
     if [[ -e $t ]]; then echo "$t" >>"$RUN_DIR/debug-traces"; fi
   done < <(debug_traces)
   if defaults read "$DEBUG_DOMAIN" >/dev/null 2>&1; then echo "defaults:$DEBUG_DOMAIN" >>"$RUN_DIR/debug-traces"; fi
+  if debug_notifications_present; then echo "notifications:$DEBUG_DOMAIN" >>"$RUN_DIR/debug-traces"; fi
   return 0
 }
 
@@ -695,6 +735,9 @@ remove_new_debug_traces() {
   if ! grep -qxF "defaults:$DEBUG_DOMAIN" "$RUN_DIR/debug-traces"; then
     defaults delete "$DEBUG_DOMAIN" >/dev/null 2>&1 || true
     rm -f "$HOME/Library/Preferences/$DEBUG_DOMAIN.plist"
+  fi
+  if ! grep -qxF "notifications:$DEBUG_DOMAIN" "$RUN_DIR/debug-traces" && debug_notifications_present; then
+    forget_debug_notifications
   fi
   # Spotlight does not index the sync worktree, but LaunchServices registers
   # an app that runs.
