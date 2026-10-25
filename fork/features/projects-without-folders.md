@@ -45,3 +45,4 @@ When upstream merges #654, or when upstream lets a project exist without a folde
 ## Adaptations
 
 - 2026-10-25, upstream cc7faea: the e2e test finds the saved layouts with a glob over `.config/*/projects/` in its throwaway home, not in `.config/macterm/projects`, so that it passes in Macterm and in MactermOff, whose config folder is `~/.config/mactermoff` (`505c8cb`, by the sync's fix agent). The app did not change. A codex review found the `$schema` gap above; it was there before the sync.
+- 2026-10-25, by hand: the comment of that test now has the text of PR #654 (`aeddbeb`), which got the same change. The fork and the PR have the same code again, so that the sync can retire the feature when upstream merges the PR.
