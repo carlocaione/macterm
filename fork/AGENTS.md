@@ -49,7 +49,7 @@ Rules:
 
 1. Fetch upstream. Save the fork's remote branch tips, for the lease of `promote`.
 2. Rebase `off/base`, then each feature, onto upstream `main`, as `off/next/base` and `off/next/feat/<name>`. All of this happens in the sync worktree (`../macterm-off-sync`), not in your checkout.
-3. When a rebase stops on a conflict, an agent resolves it. It keeps upstream's change and applies the intent of the fork commit on top. The script stages the files and continues. Git's `rerere` replays a resolution that it saw before.
+3. When a rebase stops on a conflict, an agent resolves it. It keeps upstream's change and applies the intent of the fork commit on top. The script stages the files and continues. Git's `rerere` replays a resolution that it saw before. After the rebase, the agent updates the feature's description, because the description is a later commit and is not there during the rebase.
 4. A feature whose code is all upstream now (only its `fork/` file is left) is **retired**: it is not in the integration, and `promote` deletes its branch.
 5. Each branch must pass the gate (`fork/gate.sh`): setup, identity (`off/base` only), format, lint, unit tests, strings. When a step fails, an agent fixes the branch, and the gate runs again (`--attempts`). A branch that still fails is left out, and the sync continues with the others.
 6. A second agent (the reviewer) reads each feature that upstream touched, or that an agent changed. It answers KEEP, ADAPT or RETIRE, with evidence. It finds what the gate cannot find: upstream now does the same thing, or a convention changed.
@@ -58,7 +58,7 @@ Rules:
 
 Then:
 
-- `fork/sync.sh promote` makes a backup tag of each old tip (`off-backup/<time>/...`), moves `off/*` to `off/next/*`, and pushes them to the fork with a lease.
+- `fork/sync.sh promote` pushes the ready `off/next/*` branches to the fork as `off/*`, with a lease: if the fork changed after the sync read it, the push fails and nothing moves. Then it makes a backup tag of each old tip (`off-backup/<time>/...`) and moves the local `off/*` branches.
 - `fork/sync.sh abandon` deletes `off/next/*`. Your branches stay as they were.
 - `fork/sync.sh status` shows the branches and the last report.
 

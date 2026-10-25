@@ -418,6 +418,52 @@ review_branch() {
   } | sec "$label"
 }
 
+# ─── Description ────────────────────────────────────────────────────────────
+
+# After a rebase with resolved conflicts, the agent brings the feature's
+# description up to date. During the rebase the description was not there:
+# it is a later commit of the branch.
+update_description() {
+  local label=$1 doc="fork/features/$1.md" a line f
+  [[ -f $SYNC_DIR/$doc ]] || return 0
+  local prompt="$RUN_DIR/$label.describe.prompt.md" answer="$RUN_DIR/$label.describe.md"
+  {
+    sed -e "s|<name>|$label|g" -e "s|<date>|$(date +%Y-%m-%d)|g" -e "s|<sha>|$(short "$UPSTREAM_SHA")|g" \
+      "$FORK_DIR/prompts/describe.md"
+    context_header "$label"
+    for a in "$RUN_DIR/$label".resolve-[0-9]*.md; do
+      [[ -f $a && $a != *.prompt.md ]] || continue
+      echo
+      echo "## Answer of the agent that resolved the conflicts ($(basename "$a"))"
+      echo
+      cat "$a"
+    done
+    echo
+    echo "## The feature on top of the new upstream (at most 1500 lines)"
+    echo
+    echo '```diff'
+    W diff "$UPSTREAM_SHA" HEAD -- . ':(exclude)fork' | head -n 1500 || true
+    echo '```'
+  } >"$prompt"
+  run_agent fix "$AGENT" "$prompt" "$answer"
+  # Keep only the description. Other files are not for this step.
+  while IFS= read -r line; do
+    f="${line:3}"
+    [[ -n $f && $f != "$doc" ]] || continue
+    if [[ ${line:0:2} == "??" ]]; then rm -rf "${SYNC_DIR:?}/$f"; else W restore --source=HEAD --staged --worktree -- "$f"; fi
+    say "   dropped a change outside the description: $f"
+  done < <(W status --porcelain)
+  [[ -n $(W status --porcelain -- "$doc") ]] || return 0
+  W add -- "$doc"
+  W commit -q -m "Update the $label description for upstream $(short "$UPSTREAM_SHA")" \
+    -m "fork/sync.sh: the rebase onto upstream $(short "$UPSTREAM_SHA") resolved conflicts in this feature."
+  W rev-parse HEAD >>"$RUN_DIR/$label.fix-commits"
+  {
+    echo "**Description updated by $AGENT** (\`$(W rev-parse --short HEAD)\`): $(head -n 1 "$answer")"
+    echo
+  } | sec "$label"
+}
+
 # ─── One branch ─────────────────────────────────────────────────────────────
 
 sync_one() {
@@ -471,6 +517,10 @@ sync_one() {
     { echo; echo "No code of the feature is left on top of upstream: the feature is retired."; echo; } | sec "$label"
     say "   retired: upstream has all of its code"
     return 0
+  fi
+
+  if [[ $label != base && -s $RUN_DIR/$label.conflicts ]]; then
+    update_description "$label"
   fi
 
   if [[ $GATES == full ]]; then
@@ -706,69 +756,80 @@ cmd_promote() {
     [[ $(get base status) == ready ]] || die "off/next/base is $(get base status). Fix it, or use --force"
     [[ $(get main status) == ready ]] || die "off/next/main is $(get main status). Fix it, or use --force"
   fi
-  local stamp f label b nb wt
-  stamp="$(date +%Y%m%d-%H%M%S)"
-  local labels=(base) moved=() deleted=()
+  local f label b nb wt status stamp
+  local labels=(base) moves=() deletes=()
   while IFS= read -r f; do [[ -n $f ]] && labels+=("$f"); done <"$RUN_DIR/features"
   labels+=(main)
 
-  # The sync worktree must not hold an off/next branch.
+  # 1. Plan, and check each worktree, before anything moves.
   W checkout -q --detach 2>/dev/null || true
   for label in "${labels[@]}"; do
     nb="$(next_branch "$label")"
     if [[ $label == main ]]; then b=off/main; else b="$(src_branch "$label")"; fi
-    if [[ $(get "$label" status) == retired ]]; then
-      if R rev-parse -q --verify "refs/heads/$b" >/dev/null; then
-        R tag "off-backup/$stamp/${b#off/}" "$b"
-        R branch -q -D "$b"
-        deleted+=("$b")
-        say "retired: deleted $b (backup: off-backup/$stamp/${b#off/})"
+    status="$(get "$label" status)"
+    wt="$(worktree_of "$b")"
+    if [[ $status == retired ]]; then
+      R rev-parse -q --verify "refs/heads/$b" >/dev/null || continue
+      [[ -z $wt ]] || die "$wt has $b checked out. Switch it to another branch, then run promote again"
+      deletes+=("$b")
+    elif { [[ $status == ready ]] || ((force)); } && R rev-parse -q --verify "refs/heads/$nb" >/dev/null; then
+      if R rev-parse -q --verify "refs/heads/$b" >/dev/null && [[ $(R rev-parse "$b") == "$(R rev-parse "$nb")" ]]; then
+        say "unchanged: $b"
+        continue
       fi
-    elif [[ $(get "$label" status) == ready ]] || ((force)) && R rev-parse -q --verify "refs/heads/$nb" >/dev/null; then
-      if R rev-parse -q --verify "refs/heads/$b" >/dev/null; then
-        if [[ $(R rev-parse "$b") == "$(R rev-parse "$nb")" ]]; then
-          say "unchanged: $b"
-          continue
-        fi
-        R tag "off-backup/$stamp/${b#off/}" "$b"
+      if [[ -n $wt && -n $(git -C "$wt" status --porcelain --untracked-files=no) ]]; then
+        die "$wt has changes on $b. Commit or stash them, then run promote again"
       fi
-      wt="$(worktree_of "$b")"
-      if [[ -n $wt ]]; then
-        [[ -z $(git -C "$wt" status --porcelain --untracked-files=no) ]] || die "$wt has changes on $b: commit or stash them, then run promote again"
-        git -C "$wt" checkout -q -B "$b" "$nb"
-      else
-        R branch -q -f "$b" "$nb"
-      fi
-      moved+=("$b")
-      say "moved: $b -> $(R log -1 --format='%h %s' "$b")"
+      moves+=("$b")
     else
-      say "kept: $b ($(get "$label" status))"
+      say "kept: $b ($status)"
     fi
   done
+
+  # 2. Push first. When the fork refuses, nothing moves here.
+  if ((push)) && ((${#moves[@]} + ${#deletes[@]})); then
+    [[ -f $RUN_DIR/remote-tips ]] || die "the sync could not read the fork, so there is no lease. Use --no-push, and push by hand"
+    local args=() refspecs=() sha
+    for b in ${moves[@]+"${moves[@]}"}; do
+      sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
+      args+=("--force-with-lease=refs/heads/$b:$sha")
+      refspecs+=("refs/heads/off/next/${b#off/}:refs/heads/$b")
+    done
+    for b in ${deletes[@]+"${deletes[@]}"}; do
+      sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
+      [[ -n $sha ]] || continue
+      args+=("--force-with-lease=refs/heads/$b:$sha")
+      refspecs+=(":refs/heads/$b")
+    done
+    if ((${#refspecs[@]})); then
+      say "Pushing to $PUSH_URL"
+      R push --atomic "$PUSH_URL" "${args[@]}" "${refspecs[@]}" ||
+        die "the fork refused the push, and nothing moved here. The fork changed after the sync read it: look at it, then run 'fork/sync.sh abandon' and sync again"
+    fi
+  fi
+
+  # 3. Move the local branches, with a backup tag of each old tip.
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  for b in ${moves[@]+"${moves[@]}"}; do
+    nb="off/next/${b#off/}"
+    R rev-parse -q --verify "refs/heads/$b" >/dev/null && R tag "off-backup/$stamp/${b#off/}" "$b"
+    wt="$(worktree_of "$b")"
+    if [[ -n $wt ]]; then
+      git -C "$wt" checkout -q -B "$b" "$nb"
+    else
+      R branch -q -f "$b" "$nb"
+    fi
+    say "moved: $b -> $(R log -1 --format='%h %s' "$b")"
+  done
+  for b in ${deletes[@]+"${deletes[@]}"}; do
+    R tag "off-backup/$stamp/${b#off/}" "$b"
+    R branch -q -D "$b"
+    say "retired: deleted $b (backup: off-backup/$stamp/${b#off/})"
+  done
   for label in "${labels[@]}"; do
-    nb="$(next_branch "$label")"
-    R branch -q -D "$nb" 2>/dev/null || true
+    R branch -q -D "$(next_branch "$label")" 2>/dev/null || true
   done
   rm -f "$STATE_DIR/pending"
-
-  if ((push == 0)) || ((${#moved[@]} + ${#deleted[@]} == 0)); then
-    return 0
-  fi
-  [[ -f $RUN_DIR/remote-tips ]] || die "the sync could not read the fork, so there is no lease. Push by hand"
-  local args=() refspecs=() sha
-  for b in ${moved[@]+"${moved[@]}"}; do
-    sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
-    args+=("--force-with-lease=refs/heads/$b:$sha")
-    refspecs+=("refs/heads/$b:refs/heads/$b")
-  done
-  for b in ${deleted[@]+"${deleted[@]}"}; do
-    sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
-    [[ -n $sha ]] || continue
-    args+=("--force-with-lease=refs/heads/$b:$sha")
-    refspecs+=(":refs/heads/$b")
-  done
-  say "Pushing to $PUSH_URL"
-  R push --atomic "$PUSH_URL" "${args[@]}" "${refspecs[@]}"
 }
 
 cmd_abandon() {

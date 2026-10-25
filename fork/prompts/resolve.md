@@ -10,6 +10,7 @@ You work in a git worktree of MactermOff, a fork of Macterm (a macOS terminal ap
 - Do not run git commands that change the repository (`commit`, `add`, `rebase`, `merge`, `reset`, `checkout`, `switch`, `restore`, `stash`, `branch`, `tag`, `push`). The script stages your files and continues.
 - Follow the upstream `AGENTS.md` in the worktree for code style, and the fork rules below.
 - A `Localizable.xcstrings` conflict: keep the entries of both sides, in the order of their keys. Every entry needs its `ko` and `zh-Hans` translations.
+- During a rebase, the feature description (`fork/features/<name>.md`) can be missing from the worktree: it is a later commit of the branch. Do not create it. In your answer, name each statement of it that your resolution makes false. A later step updates it.
 - If you cannot resolve a conflict safely, leave its markers and explain why in your answer. The script then stops this branch, and a person resolves it.
 
 ## Your answer
