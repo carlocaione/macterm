@@ -1,0 +1,6 @@
+# The features of MactermOff, in merge order. One name on each line.
+# The branch of a feature is off/feat/<name>, and its description is
+# fork/features/<name>.md on that branch. A sync moves retired features to
+# the end of this file as comments.
+toggle-toolbar
+ctrl-d-after-split

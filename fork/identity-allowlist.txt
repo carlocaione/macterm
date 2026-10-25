@@ -1,0 +1,63 @@
+# Lines of code that still name Macterm's identity, and that MactermOff keeps
+# on purpose. fork/identity.sh --check fails on a line that is not here.
+# Format: <file><TAB><line without indentation>. Comments start with "#".
+#
+# Why these lines can stay:
+# - The Debug build, the CLI, the icon helper and the tests keep upstream's
+#   bundle IDs: only the release app must differ from Macterm.
+# - Queue labels, the benchmark notifications and the drag-and-drop types are
+#   names inside one process or one app, not shared state.
+# - AppInfo's fallbacks apply only when the bundle has no Info.plist.
+# - The CLI also finds Macterm after MactermOff (CLI/ControlClient.swift).
+# - Agent skills, the tutor and the CLI help still say ~/.config/macterm and
+#   /Applications/Macterm.app (a known gap, see fork/AGENTS.md).
+# - Benchmark and smoke scripts take the app path as an argument.
+CLI/ControlClient.swift	for flavor in ["MactermOff", "Macterm", "Macterm Debug"] {
+CLI/PaletteCommand.swift	abstract: "List the palettes of the extensions in ~/.config/macterm/extensions with their name, state and any error."
+CLI/SkillsCommand.swift	/Applications/Macterm.app/Contents/Resources/bin/macterm.)
+Macterm/App/AppInfo.swift	let appBundleID = Bundle.main.bundleIdentifier ?? "com.thdxg.macterm"
+Macterm/App/AppInfo.swift	let appDisplayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Macterm"
+Macterm/App/BenchmarkControl.swift	private static let notificationPrefix = "com.thdxg.macterm.bench."
+Macterm/App/Tutorial.swift	"    " + s.accent("~/.config/macterm/pinned.yaml"),
+Macterm/Control/AgentSkills/AgentSkills.swift	`/Applications/Macterm.app/Contents/Resources/bin/macterm`. Macterm must be running.
+Macterm/Control/AgentSkills/PalettesSkill.swift	An extension is a folder in `~/.config/macterm/extensions/`, for example `kubernetes/`. It has an
+Macterm/Control/AgentSkills/PalettesSkill.swift	Create or edit a Macterm extension, which is a folder in ~/.config/macterm/extensions with an \
+Macterm/Control/AgentSkills/PalettesSkill.swift	reads palettes only from extensions. It does not read `~/.config/macterm/palettes/`, which earlier
+Macterm/Control/AgentSkills/WorkspaceSkill.swift	This writes the live workspace to `~/.config/macterm/projects/api.yaml`. The file has the name of the
+Macterm/Control/AgentSkills/WorkspaceSkill.swift	YAML file in ~/.config/macterm/projects and apply it again later. It also explains what keeps running \
+Macterm/Control/AgentSkills/WorkspaceSkill.swift	declared in `~/.config/macterm/pinned.yaml`, which Macterm keeps up to date. An edit there applies
+Macterm/Control/ControlHandler.swift	action: "edit ~/.config/macterm/pinned.yaml instead"
+Macterm/Control/ControlSocketServer.swift	label: "com.thdxg.macterm.control-connection",
+Macterm/Control/ControlSocketServer.swift	thread.name = "com.thdxg.macterm.control-socket"
+Macterm/Info.plist	<string>com.thdxg.macterm.pane-id</string>
+Macterm/Info.plist	<string>com.thdxg.macterm.project-move</string>
+Macterm/Info.plist	<string>com.thdxg.macterm.tab-move</string>
+Macterm/Info.plist	tile, Cmd-Tab and Finder label it "Macterm Debug" — all three read the
+Macterm/Palette/Custom/PaletteRegistry.swift	request.setValue("Macterm", forHTTPHeaderField: "User-Agent")
+Macterm/Views/PaneDragDrop.swift	static let mactermPaneID = UTType(exportedAs: "com.thdxg.macterm.pane-id")
+Macterm/Views/Sidebar.swift	static let mactermProject = UTType(exportedAs: "com.thdxg.macterm.project-move")
+Macterm/Views/Sidebar.swift	static let mactermTab = UTType(exportedAs: "com.thdxg.macterm.tab-move")
+project.yml	- "Resources/zmx"
+project.yml	PRODUCT_BUNDLE_IDENTIFIER: com.thdxg.macterm.cli
+project.yml	PRODUCT_BUNDLE_IDENTIFIER: com.thdxg.macterm.debug
+project.yml	PRODUCT_BUNDLE_IDENTIFIER: com.thdxg.macterm.icon-renderer
+project.yml	PRODUCT_BUNDLE_IDENTIFIER: com.thdxg.macterm.tests
+scripts/_harness.py	- Isolate the instance: a throwaway $HOME (shell rc files, ~/.config/macterm),
+scripts/_harness.py	NOTIFY_PREFIX = "com.thdxg.macterm.bench."
+scripts/bench.sh	--app "$DERIVED_DATA/Build/Products/Release/Macterm.app" \
+scripts/benchmark.py	run.add_argument("--app", required=True, help="path to the built Macterm.app")
+scripts/build.sh	ZMX_BINARY="$APP_BUNDLE/Contents/Resources/zmx/zmx"
+scripts/build.sh	hdiutil create -volname "Macterm" -srcfolder "$DMG_STAGING" -ov -format UDZO "$BUILD_DIR/$DMG_NAME"
+scripts/e2e/conftest.py	The suite drives a real, GUI Macterm.app: launched hermetically (throwaway
+scripts/e2e/conftest.py	help="Path to the built Macterm.app under test (default: the Debug build)",
+scripts/embed-zmx.sh	--timestamp=none "${destination_dir}/zmx"
+scripts/embed-zmx.sh	chmod +x "${destination_dir}/zmx"
+scripts/embed-zmx.sh	cp -cp "${zmx_source}" "${destination_dir}/zmx" 2>/dev/null || cp -p "${zmx_source}" "${destination_dir}/zmx"
+scripts/embed-zmx.sh	destination_dir="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/zmx"
+scripts/embed-zmx.sh	zmx_source="${srcroot}/Macterm/Resources/zmx/zmx"
+scripts/logs.sh	BUNDLE_ID="com.thdxg.macterm.debug"
+scripts/older-macos-smoke.sh	--env ZMX_DIR="$ROOT/zmx" \
+scripts/older-macos-smoke.sh	APP="${1:?usage: older-macos-smoke.sh <Macterm.app>}"
+scripts/older-macos-smoke.sh	mkdir -p "$ROOT/home/.config" "$ROOT/data" "$ROOT/zmx"
+scripts/setup.sh	ZMX_BIN="Macterm/Resources/zmx/zmx"
+scripts/setup.sh	ZMX_REPO="thdxg/zmx"
