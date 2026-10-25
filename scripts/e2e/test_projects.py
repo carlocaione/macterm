@@ -66,7 +66,10 @@ def test_projects_without_folders_keep_tabs_layouts_and_sessions_after_restart(a
         assert second["path"] == ""
         assert second["id"] != first["id"]
         instance.cli("layout", "save", "--project", second["id"])
-        layouts = list((Path(instance.home) / ".config/macterm/projects").glob("*.yaml"))
+        # Find the layouts by a pattern, not in the config folder of one app:
+        # a build with another identity keeps them in a folder with another
+        # name. The home is a throwaway, so only this instance wrote layouts.
+        layouts = list(Path(instance.home).glob(".config/*/projects/*.yaml"))
         assert len(layouts) == 2
         contents = [path.read_text() for path in layouts]
         for project in [first, second]:
