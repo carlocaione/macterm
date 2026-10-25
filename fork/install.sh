@@ -35,4 +35,9 @@ VERSION="$(macterm_tip_version)"
 unset SPARKLE_ED_PUBLIC_KEY
 MACTERM_CODESIGN_IDENTITY="$identity" VERSION="$VERSION" mise exec -- ./scripts/build.sh
 ./scripts/install.sh
+# The build leaves a second MactermOff.app in build/, and Spotlight and
+# LaunchServices then list two apps. The installed copy is the only one.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -u build/export/MactermOff.app 2>/dev/null || true
+rm -rf build/export build/Macterm.xcarchive build/Macterm-*.dmg
 echo "Installed /Applications/MactermOff.app $VERSION ($(git rev-parse --short HEAD))"
