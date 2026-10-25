@@ -23,6 +23,7 @@ The user groups terminal sessions by task, and many tasks have no single folder.
 - A project without a folder cannot take the current directory as its path, and never scans the home folder for Files.
 - Tests: `ProjectStoreTests`, `ProjectFileStoreTests`, `ProjectFileTests`, `AppStateTests`, `ControlHandlerTests`, `LayoutReconcilerTests`, `CustomPaletteScopeTests`, `FilesPaletteScopeTests`, and the e2e test in the front matter (tabs, layouts and sessions survive a restart).
 - `assets/project.schema.json` allows `id` without `path`. Keep it in step with `ProjectFile`.
+- Known gap until upstream merges #654: the `$schema` line of a saved layout points to upstream's schema on `main`, which requires `path:`. An editor that validates against it flags a layout without a folder. The app reads the file correctly.
 - Translations: every new string has `ko` and `zh-Hans`.
 
 ## Where it lives
@@ -42,3 +43,5 @@ In MactermOff, the two project files are in the `MactermOff` App Support folder,
 When upstream merges #654, or when upstream lets a project exist without a folder in another way. If upstream adds it with another storage format, the fork must migrate `projects_folderless.json` and `id:` layouts before it drops this feature.
 
 ## Adaptations
+
+- 2026-10-25, upstream cc7faea: the e2e test finds the saved layouts with a glob over `.config/*/projects/` in its throwaway home, not in `.config/macterm/projects`, so that it passes in Macterm and in MactermOff, whose config folder is `~/.config/mactermoff` (`505c8cb`, by the sync's fix agent). The app did not change. A codex review found the `$schema` gap above; it was there before the sync.
