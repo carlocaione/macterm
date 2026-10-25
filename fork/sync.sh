@@ -693,10 +693,13 @@ remove_new_debug_traces() {
   done < <(debug_traces)
   if ! grep -qxF "defaults:$DEBUG_DOMAIN" "$RUN_DIR/debug-traces"; then
     defaults delete "$DEBUG_DOMAIN" >/dev/null 2>&1 || true
+    rm -f "$HOME/Library/Preferences/$DEBUG_DOMAIN.plist"
   fi
   # Spotlight does not index the sync worktree, but LaunchServices registers
   # an app that runs.
-  "$LSREGISTER" -u "$SYNC_DIR/build/DerivedData/Build/Products/Debug/Macterm Debug.app" >/dev/null 2>&1 || true
+  local app="$SYNC_DIR/build/DerivedData/Build/Products/Debug/Macterm Debug.app"
+  "$LSREGISTER" -u "$app" >/dev/null 2>&1 || true
+  "$LSREGISTER" -u "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app" >/dev/null 2>&1 || true
   return 0
 }
 
@@ -736,6 +739,7 @@ cmd_sync() {
   RUN_DIR="$STATE_DIR/runs/$RUN_ID"
   REPORT="$STATE_DIR/reports/$RUN_ID.md"
   mkdir -p "$RUN_DIR"
+  put main old-tip "$(R rev-parse -q --verify refs/heads/off/main || true)"
   note_debug_traces
   trap 'remove_new_debug_traces; rmdir "$STATE_DIR/lock" 2>/dev/null' EXIT
   FEATURES=()
@@ -796,25 +800,34 @@ cmd_promote() {
     [[ $(get base status) == ready ]] || die "off/next/base is $(get base status). Fix it, or use --force"
     [[ $(get main status) == ready ]] || die "off/next/main is $(get main status). Fix it, or use --force"
   fi
-  local f label b nb wt status stamp
-  local labels=(base) moves=() deletes=()
+  local f label b nb wt status stamp cur old remote
+  local labels=(base) moves=() pushes=() deletes=()
   while IFS= read -r f; do [[ -n $f ]] && labels+=("$f"); done <"$RUN_DIR/features"
   labels+=(main)
+  remote_tip() { awk -v ref="refs/heads/$1" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips" 2>/dev/null || true; }
 
-  # 1. Plan, and check each worktree, before anything moves.
+  # 1. Plan, and check each branch and worktree, before anything moves.
   W checkout -q --detach 2>/dev/null || true
   for label in "${labels[@]}"; do
     nb="$(next_branch "$label")"
     if [[ $label == main ]]; then b=off/main; else b="$(src_branch "$label")"; fi
     status="$(get "$label" status)"
     wt="$(worktree_of "$b")"
+    cur="$(R rev-parse -q --verify "refs/heads/$b" || true)"
+    old="$(get "$label" old-tip)"
+    # A commit made on an off/* branch after the sync read it is not in
+    # off/next/*, and moving the branch would drop it.
+    if [[ -n $cur && $cur != "$old" && $cur != "$(R rev-parse -q --verify "refs/heads/$nb" || true)" ]]; then
+      die "$b changed after the sync read it (now $(short "$cur")). Run 'fork/sync.sh abandon', then sync again"
+    fi
     if [[ $status == retired ]]; then
-      R rev-parse -q --verify "refs/heads/$b" >/dev/null || continue
+      [[ -n $cur ]] || continue
       [[ -z $wt ]] || die "$wt has $b checked out. Switch it to another branch, then run promote again"
       deletes+=("$b")
     elif { [[ $status == ready ]] || ((force)); } && R rev-parse -q --verify "refs/heads/$nb" >/dev/null; then
-      if R rev-parse -q --verify "refs/heads/$b" >/dev/null && [[ $(R rev-parse "$b") == "$(R rev-parse "$nb")" ]]; then
-        say "unchanged: $b"
+      [[ $(R rev-parse "$nb") == "$(remote_tip "$b")" ]] || pushes+=("$b")
+      if [[ $cur == "$(R rev-parse "$nb")" ]]; then
+        say "unchanged here: $b"
         continue
       fi
       if [[ -n $wt && -n $(git -C "$wt" status --porcelain --untracked-files=no) ]]; then
@@ -827,18 +840,17 @@ cmd_promote() {
   done
 
   # 2. Push first. When the fork refuses, nothing moves here.
-  if ((push)) && ((${#moves[@]} + ${#deletes[@]})); then
+  if ((push)) && ((${#pushes[@]} + ${#deletes[@]})); then
     [[ -f $RUN_DIR/remote-tips ]] || die "the sync could not read the fork, so there is no lease. Use --no-push, and push by hand"
-    local args=() refspecs=() sha
-    for b in ${moves[@]+"${moves[@]}"}; do
-      sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
-      args+=("--force-with-lease=refs/heads/$b:$sha")
+    local args=() refspecs=()
+    for b in ${pushes[@]+"${pushes[@]}"}; do
+      args+=("--force-with-lease=refs/heads/$b:$(remote_tip "$b")")
       refspecs+=("refs/heads/off/next/${b#off/}:refs/heads/$b")
     done
     for b in ${deletes[@]+"${deletes[@]}"}; do
-      sha="$(awk -v ref="refs/heads/$b" '$2 == ref { print $1 }' "$RUN_DIR/remote-tips")"
-      [[ -n $sha ]] || continue
-      args+=("--force-with-lease=refs/heads/$b:$sha")
+      remote="$(remote_tip "$b")"
+      [[ -n $remote ]] || continue
+      args+=("--force-with-lease=refs/heads/$b:$remote")
       refspecs+=(":refs/heads/$b")
     done
     if ((${#refspecs[@]})); then
