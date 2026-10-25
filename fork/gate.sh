@@ -3,10 +3,11 @@
 # checkout. It prints one line for each step and writes the output of each
 # step to <logs>/<step>.log. It stops at the first step that fails (exit 1).
 #
-# Usage: fork/gate.sh [--steps <a,b,...>] [--e2e <pytest selector>]... [--logs <dir>]
+# Usage: fork/gate.sh [--steps <a,b,...>] [--base <ref>] [--e2e <pytest selector>]... [--logs <dir>]
 #   Steps: setup identity format lint unit strings e2e
-#   Default: setup,format,lint,unit,strings. "identity" is for a checkout
-#   with the fork identity (off/base, off/main). "e2e" runs the --e2e tests.
+#   Default: setup,format,lint,unit,strings. "identity" checks the whole tree
+#   of off/base or off/main, and on a feature branch the lines added since
+#   --base (upstream main). "e2e" runs the --e2e tests.
 #
 # The e2e step starts hermetic app windows. They take the keyboard focus.
 set -euo pipefail
@@ -14,6 +15,7 @@ set -euo pipefail
 FORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 steps="setup,format,lint,unit,strings"
 logs="build/fork-gate"
+base=""
 e2e=()
 
 while (($#)); do
@@ -21,7 +23,8 @@ while (($#)); do
     --steps) steps="$2"; shift 2 ;;
     --e2e) e2e+=("$2"); shift 2 ;;
     --logs) logs="$2"; shift 2 ;;
-    -h | --help) sed -n '2,12p' "$0"; exit 0 ;;
+    --base) base="$2"; shift 2 ;;
+    -h | --help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "gate: unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -33,7 +36,16 @@ VENV="$PWD/build/e2e-venv"
 # Each step is one command or an explicit && chain: `set -e` does not apply
 # inside a function that runs as the condition of an `if`.
 step_setup() { ./scripts/setup.sh; }
-step_identity() { "$FORK_DIR/identity.sh" --check; }
+step_identity() {
+  if [[ -f fork/identity-allowlist.txt ]]; then
+    "$FORK_DIR/identity.sh" --check
+  elif [[ -n $base ]]; then
+    "$FORK_DIR/identity.sh" --check-added "$base"
+  else
+    echo "identity: a feature branch needs --base <upstream ref>"
+    return 1
+  fi
+}
 step_format() { mise exec -- ./scripts/format.sh --check; }
 step_lint() { mise exec -- ./scripts/lint.sh; }
 # The unit-test host is the whole Debug app, and it reads and writes the

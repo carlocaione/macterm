@@ -48,6 +48,8 @@ die() {
 init() {
   FORK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   GIT_COMMON="$(git -C "$FORK_DIR" rev-parse --path-format=absolute --git-common-dir)"
+  # R runs at the top, so that a path in a pathspec is from the top too.
+  REPO_TOP="$(git -C "$FORK_DIR" rev-parse --show-toplevel)"
   STATE_DIR="$GIT_COMMON/off-sync"
   SYNC_DIR="${OFF_SYNC_DIR:-$(dirname "$(dirname "$GIT_COMMON")")/macterm-off-sync.noindex}"
   UPSTREAM="${OFF_UPSTREAM:-origin/main}"
@@ -59,7 +61,7 @@ init() {
 }
 
 # R: git on the repository (the refs are shared). W: git in the sync worktree.
-R() { git -C "$FORK_DIR" "$@"; }
+R() { git -C "$REPO_TOP" "$@"; }
 W() { git -C "$SYNC_DIR" "$@"; }
 
 short() { R rev-parse --short "$1"; }
@@ -290,7 +292,7 @@ gate_with_fixes() {
   while :; do
     out="$RUN_DIR/$label.gate-$attempt.txt"
     if ((attempt == 0)); then say "   gate: $steps"; else say "   gate again, after fix $attempt"; fi
-    if (cd "$SYNC_DIR" && "$FORK_DIR/gate.sh" --steps "$steps" --logs "$RUN_DIR/gate/$label-$attempt" \
+    if (cd "$SYNC_DIR" && "$FORK_DIR/gate.sh" --steps "$steps" --base "$UPSTREAM_SHA" --logs "$RUN_DIR/gate/$label-$attempt" \
       ${e2e_args[@]+"${e2e_args[@]}"}) >"$out" 2>&1; then
       sed 's/^/     /' "$out" >&2
       { echo "**Gate** (after $attempt fixes):"; echo; echo '```'; cat "$out"; echo '```'; echo; } | sec "$label"
@@ -319,7 +321,7 @@ fix_branch() {
     echo
     echo "The gate command, to run at the root of the worktree:"
     echo
-    echo "    $FORK_DIR/gate.sh --steps $steps"
+    echo "    $FORK_DIR/gate.sh --steps $steps --base $UPSTREAM_SHA"
     echo
     log_excerpt "$step_log"
     descriptions "$label"
@@ -524,8 +526,7 @@ sync_one() {
   fi
 
   if [[ $GATES == full ]]; then
-    local steps="setup,format,lint,unit,strings"
-    [[ $label == base ]] && steps="setup,identity,format,lint,unit,strings"
+    local steps="setup,identity,format,lint,unit,strings"
     if gate_with_fixes "$label" "$steps"; then
       if [[ -s $RUN_DIR/$label.fix-commits ]]; then
         put "$label" gate "pass after $(wc -l <"$RUN_DIR/$label.fix-commits" | tr -d ' ') fix"

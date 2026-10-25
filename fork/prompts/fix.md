@@ -9,7 +9,8 @@ You work in a git worktree of MactermOff, a fork of Macterm (a macOS terminal ap
 - Never delete, skip or weaken a test to make it pass. If upstream removed the behavior that a test checks, say so in your answer, and stop.
 - A format failure: run `mise exec -- ./scripts/format.sh` (it fixes the files in place).
 - A strings failure: run `mise exec -- ./scripts/strings.sh` (it updates the catalog), then add the `ko` and `zh-Hans` translations of each new entry.
-- An identity failure: upstream added a line that names Macterm's identity. Change it for MactermOff as `fork/AGENTS.md` (Identity) says, or, if the line is not shared state, add it to `fork/identity-allowlist.txt`.
+- An identity failure on `off/base`: upstream added a line that names Macterm's identity. Change it for MactermOff as `fork/AGENTS.md` (Identity) says, or, if the line is not shared state, add it to `fork/identity-allowlist.txt`.
+- An identity failure on a feature branch: the feature adds a line that names Macterm's identity, for example a path in `~/.config/macterm`. A feature must work in upstream Macterm and in MactermOff, so never write a MactermOff name or path in it. Remove the hard-coded name instead: take the path from the app (a CLI answer, `ProjectFileStore.defaultConfigDirectory()`) or from the output of the command that made the file.
 - To check your work, run the gate command below with the failing step. It can take several minutes.
 - Do not run git commands that change the repository (`commit`, `add`, `rebase`, `merge`, `reset`, `checkout`, `switch`, `restore`, `stash`, `branch`, `tag`, `push`). Leave your changes in the working tree. The script commits them.
 - When the feature now works in a different way, add a dated entry to the "Adaptations" section of its description (`fork/features/<name>.md`): what changed and why.
