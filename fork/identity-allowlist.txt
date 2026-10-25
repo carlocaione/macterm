@@ -61,3 +61,8 @@ scripts/older-macos-smoke.sh	APP="${1:?usage: older-macos-smoke.sh <Macterm.app>
 scripts/older-macos-smoke.sh	mkdir -p "$ROOT/home/.config" "$ROOT/data" "$ROOT/zmx"
 scripts/setup.sh	ZMX_BIN="Macterm/Resources/zmx/zmx"
 scripts/setup.sh	ZMX_REPO="thdxg/zmx"
+# ZmxSocketBudget.isMactermDirectory names Macterm's zmx folders to refuse them.
+Macterm/System/ZmxClient.swift	candidates.append("\(trimTrailingSlash(userTemp))/zmx-\(uid)")
+Macterm/System/ZmxClient.swift	if let tmp = env["TMPDIR"], !tmp.isEmpty { candidates.append("\(trimTrailingSlash(tmp))/zmx-\(uid)") }
+Macterm/System/ZmxClient.swift	if let xdg = env["XDG_RUNTIME_DIR"], !xdg.isEmpty { candidates.append("\(trimTrailingSlash(xdg))/zmx") }
+Macterm/System/ZmxClient.swift	var candidates = ["/tmp/zmx-\(uid)"]

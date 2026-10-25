@@ -610,11 +610,28 @@ enum ZmxSocketBudget {
     /// zmx process gets the directory as `ZMX_DIR`, so zmx never derives it.
     /// `env` is injectable for deterministic tests.
     static func socketDir(env: [String: String] = ProcessInfo.processInfo.environment) -> String {
-        if let custom = env["ZMX_DIR"], !custom.isEmpty { return custom }
+        if let custom = env["ZMX_DIR"], !custom.isEmpty, !isMactermDirectory(custom, env: env) { return custom }
         let uid = getuid()
         if let xdg = env["XDG_RUNTIME_DIR"], !xdg.isEmpty { return "\(trimTrailingSlash(xdg))/zmx-off" }
         if let tmp = env["TMPDIR"], !tmp.isEmpty { return "\(trimTrailingSlash(tmp))/zmx-off-\(uid)" }
         return "/tmp/zmx-off-\(uid)"
+    }
+
+    /// MactermOff: a `ZMX_DIR` that names one of Macterm's own directories is
+    /// not a choice of the user. Macterm sets `ZMX_DIR` in each pane, and `open`
+    /// gives an app the environment of the shell that runs it, so MactermOff
+    /// started from a Macterm pane would share Macterm's sessions.
+    private static func isMactermDirectory(_ dir: String, env: [String: String]) -> Bool {
+        let uid = getuid()
+        var candidates = ["/tmp/zmx-\(uid)"]
+        if let xdg = env["XDG_RUNTIME_DIR"], !xdg.isEmpty { candidates.append("\(trimTrailingSlash(xdg))/zmx") }
+        if let tmp = env["TMPDIR"], !tmp.isEmpty { candidates.append("\(trimTrailingSlash(tmp))/zmx-\(uid)") }
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        if confstr(_CS_DARWIN_USER_TEMP_DIR, &buffer, buffer.count) > 0 {
+            let userTemp = String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+            candidates.append("\(trimTrailingSlash(userTemp))/zmx-\(uid)")
+        }
+        return candidates.contains(trimTrailingSlash(dir))
     }
 
     private static func trimTrailingSlash(_ value: String) -> String {

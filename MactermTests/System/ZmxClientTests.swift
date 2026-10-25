@@ -72,6 +72,18 @@ struct ZmxSocketBudgetTests {
     }
 
     @Test
+    func zmxDirOfMactermIsNotTheForks() {
+        // MactermOff: an app that `open` starts from a Macterm pane gets the
+        // ZMX_DIR that Macterm set in that pane.
+        let uid = getuid()
+        #expect(ZmxSocketBudget.socketDir(env: ["ZMX_DIR": "/var/tmp/zmx-\(uid)", "TMPDIR": "/var/tmp/"])
+            == "/var/tmp/zmx-off-\(uid)")
+        #expect(ZmxSocketBudget.socketDir(env: ["ZMX_DIR": "/run/user/501/zmx/", "XDG_RUNTIME_DIR": "/run/user/501"])
+            == "/run/user/501/zmx-off")
+        #expect(ZmxSocketBudget.socketDir(env: ["ZMX_DIR": "/tmp/zmx-\(uid)"]) == "/tmp/zmx-off-\(uid)")
+    }
+
+    @Test
     func trailingSlashIsTrimmedForDerivedDirs() {
         // The derived (non-ZMX_DIR) paths must match zmx's own resolver, which
         // trims a trailing slash before appending — otherwise kill and the
