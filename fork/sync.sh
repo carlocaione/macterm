@@ -662,6 +662,44 @@ write_report() {
   } >"$REPORT"
 }
 
+# ─── Debug traces ───────────────────────────────────────────────────────────
+
+# The gate runs upstream's Debug app (the unit-test host and the e2e tests),
+# and macOS keeps traces of it in ~/Library. A sync removes the traces that
+# it made, and keeps the ones that were there before it (your own Debug use).
+DEBUG_DOMAIN=com.thdxg.macterm.debug
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
+debug_traces() {
+  printf '%s\n' "$HOME/Library/Application Support/Macterm Debug" "$HOME/Library/Caches/$DEBUG_DOMAIN" \
+    "$HOME/Library/HTTPStorages/$DEBUG_DOMAIN" "$HOME/Library/Saved Application State/$DEBUG_DOMAIN.savedState"
+}
+
+note_debug_traces() {
+  local t
+  : >"$RUN_DIR/debug-traces"
+  while IFS= read -r t; do
+    if [[ -e $t ]]; then echo "$t" >>"$RUN_DIR/debug-traces"; fi
+  done < <(debug_traces)
+  if defaults read "$DEBUG_DOMAIN" >/dev/null 2>&1; then echo "defaults:$DEBUG_DOMAIN" >>"$RUN_DIR/debug-traces"; fi
+  return 0
+}
+
+remove_new_debug_traces() {
+  local t
+  [[ -n ${RUN_DIR:-} && -f $RUN_DIR/debug-traces ]] || return 0
+  while IFS= read -r t; do
+    if [[ -e $t ]] && ! grep -qxF "$t" "$RUN_DIR/debug-traces"; then rm -rf "$t"; fi
+  done < <(debug_traces)
+  if ! grep -qxF "defaults:$DEBUG_DOMAIN" "$RUN_DIR/debug-traces"; then
+    defaults delete "$DEBUG_DOMAIN" >/dev/null 2>&1 || true
+  fi
+  # Spotlight does not index the sync worktree, but LaunchServices registers
+  # an app that runs.
+  "$LSREGISTER" -u "$SYNC_DIR/build/DerivedData/Build/Products/Debug/Macterm Debug.app" >/dev/null 2>&1 || true
+  return 0
+}
+
 # ─── Commands ───────────────────────────────────────────────────────────────
 
 cmd_sync() {
@@ -698,6 +736,8 @@ cmd_sync() {
   RUN_DIR="$STATE_DIR/runs/$RUN_ID"
   REPORT="$STATE_DIR/reports/$RUN_ID.md"
   mkdir -p "$RUN_DIR"
+  note_debug_traces
+  trap 'remove_new_debug_traces; rmdir "$STATE_DIR/lock" 2>/dev/null' EXIT
   FEATURES=()
   local f
   while IFS= read -r f; do

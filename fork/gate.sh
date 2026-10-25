@@ -36,7 +36,17 @@ step_setup() { ./scripts/setup.sh; }
 step_identity() { "$FORK_DIR/identity.sh" --check; }
 step_format() { mise exec -- ./scripts/format.sh --check; }
 step_lint() { mise exec -- ./scripts/lint.sh; }
-step_unit() { mise exec -- ./scripts/test.sh; }
+# The unit-test host is the whole Debug app, and it reads and writes the
+# config folder under HOME and its data folder. xcodebuild gives each
+# TEST_RUNNER_<name> variable to the test host as <name>, so the tests get a
+# throwaway home and never see the files of your installed app.
+step_unit() {
+  local home="$PWD/build/fork-test-home"
+  rm -rf "$home" && mkdir -p "$home/data" &&
+    TEST_RUNNER_HOME="$home" TEST_RUNNER_CFFIXED_USER_HOME="$home" TEST_RUNNER_XDG_CONFIG_HOME="$home/.config" \
+      TEST_RUNNER_MACTERM_BENCHMARK_DATA_DIR="$home/data" TEST_RUNNER_ZMX_DIR="$home/zmx" \
+      mise exec -- ./scripts/test.sh
+}
 step_strings() { mise exec -- ./scripts/strings.sh --check --no-build; }
 step_e2e() {
   if ((${#e2e[@]} == 0)); then
