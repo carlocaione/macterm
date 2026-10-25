@@ -2,5 +2,5 @@
 # The branch of a feature is off/feat/<name>, and its description is
 # fork/features/<name>.md on that branch. A sync moves retired features to
 # the end of this file as comments.
-toggle-toolbar
 ctrl-d-after-split
+# retired 2026-10-25: toggle-toolbar (upstream c873791 Add a Toggle Toolbar keybind (⌥⌘T), so that one chord brings back a hidden toolbar (#656))
