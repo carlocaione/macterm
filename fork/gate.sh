@@ -69,7 +69,10 @@ step_e2e() {
     xcodebuild -project Macterm.xcodeproj -scheme Macterm -configuration Debug \
       -derivedDataPath "$DERIVED_DATA" ONLY_ACTIVE_ARCH=YES build |
     (mise exec -- xcbeautify --quiet 2>/dev/null || cat) &&
-    { [[ -x "$VENV/bin/pytest" ]] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install --quiet pytest==8.4.1; }; } &&
+    # A venv names its own folder in its scripts: one that a moved worktree
+    # left behind does not run, so make it again.
+    { "$VENV/bin/python" -c 'import pytest' >/dev/null 2>&1 ||
+      { rm -rf "$VENV" && python3 -m venv "$VENV" && "$VENV/bin/pip" install --quiet pytest==8.4.1; }; } &&
     "$VENV/bin/pytest" -v "${e2e[@]}" --app "$APP"
 }
 

@@ -13,7 +13,7 @@ You work in a git worktree of MactermOff, a fork of Macterm (a macOS terminal ap
 - An identity failure on a feature branch: the feature adds a line that names Macterm's identity, for example a path in `~/.config/macterm`. A feature must work in upstream Macterm and in MactermOff, so never write a MactermOff name or path in it. Remove the hard-coded name instead: take the path from the app (a CLI answer, `ProjectFileStore.defaultConfigDirectory()`) or from the output of the command that made the file.
 - To check your work, run the gate command below with the failing step. It can take several minutes.
 - Do not run git commands that change the repository (`commit`, `add`, `rebase`, `merge`, `reset`, `checkout`, `switch`, `restore`, `stash`, `branch`, `tag`, `push`). Leave your changes in the working tree. The script commits them.
-- When the feature now works in a different way, add a dated entry to the "Adaptations" section of its description (`fork/features/<name>.md`): what changed and why.
+- On a feature branch, add a dated entry to the "Adaptations" section of its description (`fork/features/<name>.md`) for each change that you make, also a change to a test only: what changed and why. Change other statements of the description that your change makes false.
 
 ## Your answer
 

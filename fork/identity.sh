@@ -6,8 +6,8 @@
 #   fork/identity.sh                      print the lines, as <file><TAB><text>
 #   fork/identity.sh --check              fail on a line that is not in the allowlist
 #                                         (a checkout of off/base or off/main)
-#   fork/identity.sh --check-added <ref>  the same, for the lines added since <ref>
-#                                         only (a checkout of a feature branch)
+#   fork/identity.sh --check-added <ref>  the same, for the lines that the working
+#                                         tree adds to <ref> (a feature branch)
 #
 # A line counts once for each file, with its indentation removed, so that a
 # line that only moves does not fail the check. Comments do not count.
@@ -34,7 +34,8 @@ lines() {
 }
 
 added_lines() {
-  git diff -U0 --no-color "$1" HEAD -- "${PATHS[@]}" |
+  # Against the working tree, so that a fix that is not committed yet counts.
+  git diff -U0 --no-color "$1" -- "${PATHS[@]}" |
     awk '/^\+\+\+ / { file = (substr($0, 1, 6) == "+++ b/") ? substr($0, 7) : ""; next }
          /^\+/ && file != "" { print file "\t" substr($0, 2) }' |
     { grep -E "${PATTERNS[@]}" || true; } | normalize | LC_ALL=C sort -u
