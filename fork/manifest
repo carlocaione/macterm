@@ -2,6 +2,6 @@
 # The branch of a feature is off/feat/<name>, and its description is
 # fork/features/<name>.md on that branch. A sync moves retired features to
 # the end of this file as comments.
-ctrl-d-after-split
 projects-without-folders
 # retired 2026-10-25: toggle-toolbar (upstream c873791 Add a Toggle Toolbar keybind (⌥⌘T), so that one chord brings back a hidden toolbar (#656))
+# retired 2026-10-26: ctrl-d-after-split (upstream 527d5fc Build mirror tabs only in the reconcile, and claim leadership on first size, so that no stray zmx client takes the keys of a pane (#660))
