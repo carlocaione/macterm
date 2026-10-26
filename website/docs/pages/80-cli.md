@@ -43,7 +43,7 @@ The grammar is `macterm <noun> <verb> [options]`. A noun with no verb means `lis
 | `project rename <project> <name>` | Renames a project. `Pinned` is a reserved name. |
 | `project remove <project> [--force]` | Removes a project and kills its sessions. Returns `busy` when a pane runs a program, unless you use `--force`. It does not touch your files. |
 | `tab list [--project P]` | Lists the tabs of a project (default: the active project). |
-| `tab new [--project P] [--run CMD] [--no-focus]` | Makes a new tab. The tab becomes active unless you use `--no-focus`. `--run` types CMD into the new shell. |
+| `tab new [--project P] [--run CMD] [--no-focus]` | Makes a new tab. The tab becomes active unless you use `--no-focus`. `--run` types CMD into the new shell. When no project is active, the new tab is a [session](/docs/sessions). |
 | `tab select <tab> [--window W]` | Makes a tab active (`tab:3`, an index, a UUID, or an exact title). |
 | `tab move <tab> <slot>` | Changes the order of a tab. `slot` is the **final** position, counted from 1. |
 | `tab rename <tab> [title] [--reset]` | Renames a tab, or restores the automatic title. |
@@ -89,7 +89,7 @@ macterm tab new --project api --no-focus --run "npm test"
 macterm pane split --session "$MACTERM_SESSION" --no-focus --run "npm run dev"
 ```
 
-The shell starts with no visit to the child, with or without `--run`. Creation returns before the shell is ready for more input. If you use `pane run`, wait for the shell prompt. Use `--json` to get the identity of the new tab or pane. Use `pane list --project P --tab T` to find the session of a new tab. `tab new` uses the **active project** by default. It does not use the project of the caller. If the two can be different, pass `--project`.
+The shell starts with no visit to the child, with or without `--run`. Creation returns before the shell is ready for more input. If you use `pane run`, wait for the shell prompt. Use `--json` to get the identity of the new tab or pane. Use `pane list --project P --tab T` to find the session of a new tab. `tab new` uses the **active project** by default. It does not use the project of the caller. If the two can be different, pass `--project`. When no project is active, `tab new` opens a [session](/docs/sessions), a tab without a project. `--project sessions` selects the sessions, as `--project pinned` selects the pinned tabs. `Sessions` is a reserved project name, with the same rules as `Pinned`.
 
 In an automation, select the app with `--socket`. When the running app is too old for `--no-focus`, the CLI refuses the command before it creates anything. The CLI asks the app for its protocol version first. It exits with an error and does not switch the view of the user in silence. Use the CLI that is in the app that you target. The `--help` of a newer CLI shows only that the flag exists in that CLI. It does not show that an older running app has it.
 

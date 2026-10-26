@@ -15,6 +15,7 @@ enum AppCommand: String, CaseIterable, Identifiable {
     case files
     // Tabs
     case newTab
+    case newSession
     case closePane
     case closeTab
     case renameTab
@@ -104,6 +105,7 @@ enum AppCommand: String, CaseIterable, Identifiable {
     private var titleResource: LocalizedStringResource {
         switch self {
         case .newTab: "New Tab"
+        case .newSession: "New Session"
         case .closePane: "Close Pane"
         case .closeTab: "Close Tab"
         case .renameTab: "Rename Current Tab"
@@ -175,6 +177,7 @@ enum AppCommand: String, CaseIterable, Identifiable {
              .passwordManager,
              .files: .palettes
         case .newTab,
+             .newSession,
              .closePane,
              .closeTab,
              .renameTab,
@@ -242,6 +245,7 @@ enum AppCommand: String, CaseIterable, Identifiable {
     var hotkeyAction: HotkeyAction? {
         switch self {
         case .newTab: .newTab
+        case .newSession: .newSession
         case .closePane: .closePane
         case .closeTab: .closeTab
         case .nextTab: .nextGlobalTab

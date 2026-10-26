@@ -215,6 +215,59 @@ struct MactermIntentsTests {
         #expect(result.value?.id == tabs.last?.id)
     }
 
+    // MARK: - The sessions (tabs without a project)
+
+    /// The picker offers the sessions only while one exists, but a saved
+    /// shortcut names them by their fixed id at any time — New Tab there is
+    /// how a shortcut opens the first session.
+    @Test
+    func the_sessions_resolve_by_id_while_no_session_exists() async throws {
+        let (appState, projectStore) = makeHost()
+        defer { teardown() }
+        #expect(!appState.hasSessions)
+
+        let resolved = try await MactermProjectQuery().entities(for: [SessionTabs.projectID])
+        let offered = try await MactermProjectQuery().allEntities()
+
+        #expect(resolved.map(\.id) == [SessionTabs.projectID])
+        #expect(!offered.contains { $0.id == SessionTabs.projectID })
+        // No project at all. (The host holds the store weakly: this use also
+        // keeps it alive to the end.)
+        #expect(projectStore.projects.isEmpty)
+    }
+
+    @Test
+    func new_tab_in_the_sessions_creates_the_first_session() async throws {
+        let (appState, projectStore) = makeHost()
+        defer { teardown() }
+        #expect(appState.sessionWorkspace == nil)
+
+        let intent = NewMactermTabIntent()
+        intent.project = try #require(try await MactermProjectQuery().entities(for: [SessionTabs.projectID]).first)
+        let result = try await intent.perform()
+
+        let tabs = try #require(appState.sessionWorkspace?.tabs)
+        #expect(tabs.count == 1)
+        #expect(result.value?.id == tabs.first?.id)
+        #expect(projectStore.projects.isEmpty)
+    }
+
+    @Test
+    func focus_project_refuses_the_sessions_while_none_exists() async throws {
+        let (appState, projectStore) = makeHost()
+        defer { teardown() }
+
+        let intent = FocusMactermProjectIntent()
+        intent.project = try #require(try await MactermProjectQuery().entities(for: [SessionTabs.projectID]).first)
+
+        let refusal = await #expect(throws: MactermIntentError.self) { try await intent.perform() }
+        if case .notFound? = refusal {} else {
+            Issue.record("expected notFound, got \(String(describing: refusal))")
+        }
+        #expect(appState.activeProjectID != SessionTabs.projectID)
+        #expect(projectStore.projects.isEmpty)
+    }
+
     @Test
     func new_tab_passes_the_command_through_as_spawn_time_input() async throws {
         let (appState, projectStore) = makeHost()
@@ -491,11 +544,12 @@ struct MactermIntentsTests {
         let (appState, projectStore) = makeHost()
         defer { teardown() }
         let delegate = attachDelegate(appState, projectStore)
-        // No project, so `AppCommand.newTab.action(in:)` is nil.
+        // No project, so `AppCommand.closeTab.action(in:)` is nil. (New Tab
+        // applies: it opens a session.)
         #expect(appState.activeProjectID == nil)
 
         let intent = InvokeMactermKeybindIntent()
-        intent.keybind = .newTab
+        intent.keybind = .closeTab
         let result = try await intent.perform()
 
         // A shortcut branches on this rather than erroring out — the command

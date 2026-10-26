@@ -49,6 +49,9 @@ struct NewMactermTabIntent: AppIntent {
         // one first so `createTab`'s selection lands somewhere visible, the
         // same preparation a Dock-menu New Tab does.
         ctx.appState.appDelegate?.showWindow()
+        // The sessions start empty and exist as soon as anything asks for
+        // them: a New Tab there opens the first session.
+        if target.id == SessionTabs.projectID { ctx.appState.ensureSessionWorkspace() }
         let trimmed = command?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let tabID = ctx.appState.createTab(
             projectID: target.id,

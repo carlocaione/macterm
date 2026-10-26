@@ -88,11 +88,12 @@ struct DockMenuTests {
         state.restoreWindows(adopting: WindowState())
         let delegate = makeDelegate(appState: state, projectStore: store)
 
-        // No project yet: New Tab has nothing to act on, the rest stand.
+        // No project yet: every item still applies — New Tab opens a session
+        // (`SessionTabs`), which needs no project.
         let withoutProject = try #require(delegate.applicationDockMenu(NSApp))
         let enabledWithout = withoutProject.items.map(\.isEnabled)
         #expect(!withoutProject.autoenablesItems)
-        #expect(enabledWithout == [true, false, true, true])
+        #expect(enabledWithout == [true, true, true, true])
 
         let project = store.create(name: "proj", path: "/tmp/proj")
         state.selectProject(project)
@@ -145,14 +146,32 @@ struct DockMenuTests {
     }
 
     @Test
+    func picking_new_tab_with_no_project_opens_a_session_and_shows_it() throws {
+        let state = makeAppState()
+        let store = makeProjectStore()
+        let window = WindowState()
+        state.restoreWindows(adopting: window)
+        state.registerWindow(window)
+        state.noteKeyWindow(window)
+        let delegate = makeDelegate(appState: state, projectStore: store)
+        #expect(window.activeProjectID == nil)
+
+        delegate.performDockMenuCommand(.newTab)
+
+        let sessions = try #require(state.sessionWorkspace)
+        #expect(sessions.tabs.count == 1)
+        #expect(window.activeProjectID == SessionTabs.projectID)
+    }
+
+    @Test
     func a_command_that_stopped_applying_is_a_no_op() {
         let state = makeAppState()
         let store = makeProjectStore()
         let delegate = makeDelegate(appState: state, projectStore: store)
 
-        // No project: New Tab's action is nil. Must not trap, must not touch
-        // the workspaces.
-        delegate.performDockMenuCommand(.newTab)
+        // No project: Close Tab's action is nil. Must not trap, must not
+        // touch the workspaces.
+        delegate.performDockMenuCommand(.closeTab)
 
         #expect(state.workspaces.isEmpty)
     }

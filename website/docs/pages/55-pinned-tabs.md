@@ -17,7 +17,7 @@ A pinned tab belongs to no project. It is above every project in the sidebar. It
 | **Pin** | Drag a tab above every project and drop it. Or use the right-click menu of the tab, the command palette, or a keybind from Settings → Keymaps. |
 | **Unpin** | Right-click the pinned row and select **Unpin Tab**. Or drag the row into a project section. |
 
-Unpinning moves the tab. The tab goes back to the project that it came from, and its shells keep running. Pinning and unpinning never end a process.
+Unpinning moves the tab. The tab goes back to the project that it came from, or to the [sessions](/docs/sessions) if you pinned it from there. Its shells keep running. Pinning and unpinning never end a process.
 
 When you pin a tab, Macterm saves its splits and the working directory of each pane. It also saves the program that runs in each pane, as the `run:` of that pane. When you start or stop a process, Macterm updates the saved layout within a few seconds.
 
@@ -41,7 +41,7 @@ tabs:
 | Edit | Effect |
 | --- | --- |
 | Add an entry | The entry becomes a pinned tab. It starts the next time that Macterm starts. |
-| Remove an entry | The next time that Macterm starts, it unpins the tab. The tab goes back to the project that it came from. No process ends. |
+| Remove an entry | The next time that Macterm starts, it unpins the tab. The tab goes back to the project or to the sessions that it came from. No process ends. |
 | Change `run:`, `cwd:` or the splits | The change applies the next time that the tab starts again. |
 
 Entries have no ids. Macterm matches an entry to a tab by `name:`, then by content, then by position. Give an entry a name before you make a large change, so Macterm can match it. Macterm reads the file again before each write, so it never overwrites your edits. If the file stops parsing, Macterm stops saving and shows an alert. It starts to save again when the file parses.

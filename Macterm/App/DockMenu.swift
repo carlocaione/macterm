@@ -56,6 +56,7 @@ enum DockMenu {
         // would flip a flag nothing draws. Not reachable from the Dock menu
         // itself — it is here for the App Intent.
         case .newTab,
+             .newSession,
              .openProject,
              .toggleCommandPalette,
              .passwordManager: .frontTerminalWindow
@@ -67,8 +68,7 @@ enum DockMenu {
 
 extension AppDelegate {
     /// Built fresh on every right-click, so an item is enabled exactly when
-    /// its command applies right now (New Tab with no project is greyed, as
-    /// in the menu bar). Nil — AppKit's stock menu — until `MainWindow` has
+    /// its command applies right now, as in the menu bar. Nil — AppKit's stock menu — until `MainWindow` has
     /// handed over the state objects, since nothing could run before then.
     func applicationDockMenu(_: NSApplication) -> NSMenu? {
         guard let appState, let projectStore else { return nil }

@@ -184,7 +184,7 @@ struct MainWindow: View {
             // Same safe-area reclaim as the sidebar: without it the terminal
             // keeps a blank strip where the hidden titlebar used to be.
             .ignoresSafeArea(chromeHidden ? .container : [], edges: .top)
-            .navigationTitle(activeProject?.name ?? appDisplayName)
+            .navigationTitle(activeProjectTitle)
             .navigationSubtitle(activeTabTitle)
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
@@ -839,10 +839,17 @@ struct MainWindow: View {
         // mirrors whichever window is KEY, so a background window would redraw
         // itself as whatever the frontmost one is showing (#345).
         guard let pid = windowState.activeProjectID else { return nil }
-        // The pinned workspace has no ProjectStore row; render it through the
-        // synthetic project.
+        // The pinned and the sessions workspace have no ProjectStore row;
+        // render them through their synthetic projects.
         if pid == PinnedTabs.projectID { return PinnedTabs.project }
+        if pid == SessionTabs.projectID { return SessionTabs.project }
         return projectStore.projects.first { $0.id == pid }
+    }
+
+    /// The sessions' title is their section's, in the app's language.
+    private var activeProjectTitle: String {
+        guard let project = activeProject else { return appDisplayName }
+        return project.id == SessionTabs.projectID ? SessionTabs.sectionTitle : project.name
     }
 
     private var activeProjectWithWorkspace: Project? {
@@ -856,6 +863,8 @@ struct MainWindow: View {
 
     private var activeTabTitle: String {
         guard let project = activeProject else { return "" }
+        // The sessions have no project directory worth advertising.
+        if project.id == SessionTabs.projectID { return "" }
         // The pinned workspace has no project directory worth advertising.
         if project.id == PinnedTabs.projectID { return "" }
         return project.path
@@ -876,6 +885,8 @@ struct WelcomeView: View {
 
     private var shortcuts: [(HotkeyAction, String)] {
         [
+            // New Tab opens a session here: this window shows no project.
+            (.newTab, String(localized: "New session")),
             (.openProject, String(localized: "Open a project")),
             (.toggleCommandPalette, String(localized: "Command palette")),
             (.toggleSidebar, String(localized: "Toggle sidebar")),

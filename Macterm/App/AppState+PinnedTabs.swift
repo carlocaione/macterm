@@ -75,9 +75,11 @@ extension AppState {
         saveWorkspaces()
     }
 
-    /// Unpin: a LOADED tab moves back to its origin project (falling back to
-    /// the first project) — a move, never a kill. An UNLOADED record has no
-    /// live tab to move; unpinning it just forgets the declaration.
+    /// Unpin: a LOADED tab moves back to where it was pinned from
+    /// (`unpinDestination`: its origin project or the sessions, else the
+    /// first project, else the sessions) — a move, never a kill. An UNLOADED
+    /// record has no live tab to move; unpinning it just forgets the
+    /// declaration.
     func unpinTab(_ tabID: UUID, projects: [Project]) {
         guard let record = pinnedRecord(tabID) else { return }
         guard isPinnedTabLoaded(tabID) else {
@@ -86,8 +88,8 @@ extension AppState {
             saveWorkspaces()
             return
         }
-        let dest = projects.first { $0.id == record.originProjectID } ?? projects.first
-        guard let dest else {
+        let isRemote = pinnedWorkspace?.tabs.first { $0.id == tabID }?.splitRoot.allPanes().contains(where: \.isRemote) ?? false
+        guard let dest = unpinDestination(for: record, isRemote: isRemote, projects: projects) else {
             presentToast(String(localized: "Cannot unpin"), subtitle: String(localized: "Add a project to move the tab into first"))
             return
         }
@@ -102,7 +104,9 @@ extension AppState {
     func unpinUnloadedRecord(_ record: PinnedTabRecord, toProject destProjectID: UUID, toIndex: Int? = nil) {
         logger.info("unpinUnloadedRecord: \(record.id, privacy: .public) → \(destProjectID, privacy: .public)")
         let tab: TerminalTab
-        if let snapshot = pendingPinnedLiveRestores.removeValue(forKey: record.id) {
+        // Read, not removed: a refusal below keeps the record and its snapshot.
+        // `removePinnedRecord` drops the snapshot with the record.
+        if let snapshot = pendingPinnedLiveRestores[record.id] {
             tab = WorkspaceSerializer.restoreTab(snapshot, projectID: destProjectID)
         } else if let built = buildDeclaredPinnedTab(record, projectID: destProjectID) {
             tab = built
@@ -111,10 +115,14 @@ extension AppState {
             saveWorkspaces()
             return
         }
+        if destProjectID == SessionTabs.projectID, !canMoveIntoSessions(tab.splitRoot.allPanes()) {
+            refuseRemoteMoveIntoSessions()
+            return
+        }
         ensureAdoptableWorkspace(projectID: destProjectID)
         workspaces[destProjectID]?.adoptTab(tab, at: toIndex)
         removePinnedRecord(forTab: record.id)
-        activeProjectID = destProjectID
+        landOnTab(tab.id, in: destProjectID)
         saveWorkspaces()
     }
 
@@ -480,8 +488,8 @@ extension AppState {
             }
             // The file unpinned a tab whose sessions may still be running:
             // honor it as a MOVE into the origin project, keeping the shells.
-            let dest = projects.first { $0.id == record.originProjectID } ?? projects.first
-            guard let dest else {
+            let isRemote = paneSnapshots(of: snapshot.splitRoot).contains { ProjectPath.isRemote($0.projectPath) }
+            guard let dest = unpinDestination(for: record, isRemote: isRemote, projects: projects) else {
                 logger.warning("pinned.yaml removed \(record.id, privacy: .public) but no project exists; forgotten")
                 continue
             }

@@ -20,6 +20,7 @@ enum MactermKeybind: String, AppEnum {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Keybind Action")
 
     case newTab = "new_tab"
+    case newSession = "new_session"
     case closePane = "close_pane"
     case closeTab = "close_tab"
     case splitRight = "split_right"
@@ -86,6 +87,7 @@ enum MactermKeybind: String, AppEnum {
     /// titles.
     static let caseDisplayRepresentations: [MactermKeybind: DisplayRepresentation] = [
         .newTab: "New Tab",
+        .newSession: "New Session",
         .closePane: "Close Pane",
         .closeTab: "Close Tab",
         .splitRight: "Split Right",

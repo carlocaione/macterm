@@ -493,13 +493,16 @@ enum CustomPaletteActions {
                 }
                 return
             }
-            guard let project = projects.first(where: { $0.id == projectID }) else {
+            // A session belongs to no project either: its command gets no
+            // project name or folder, and a new tab is a new session.
+            let isSession = projectID == SessionTabs.projectID
+            guard let project = isSession ? SessionTabs.project : projects.first(where: { $0.id == projectID }) else {
                 appState.presentToast(String(localized: "No project to run in"))
                 return
             }
             var env = CustomPaletteEnvironment.make(
-                projectName: project.name,
-                projectDirectory: project.isRemote ? nil : project.path,
+                projectName: isSession ? nil : project.name,
+                projectDirectory: project.isRemote || isSession ? nil : project.path,
                 exports: exports
             )
             // A local pane runs it before its shell, untyped
