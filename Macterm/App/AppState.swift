@@ -1032,6 +1032,11 @@ final class AppState {
         set { keyOrFirstWindow?.isNewRemoteProjectSheetPresented = newValue }
     }
 
+    var isNewFolderlessProjectSheetPresented: Bool {
+        get { keyOrFirstWindow?.isNewFolderlessProjectSheetPresented ?? false }
+        set { keyOrFirstWindow?.isNewFolderlessProjectSheetPresented = newValue }
+    }
+
     private var windowPersistTask: Task<Void, Never>?
 
     /// Persist the window list after it changes.
@@ -1757,10 +1762,18 @@ final class AppState {
 
     // MARK: - Restore / Save
 
-    func restoreSelection(projects: [Project]) {
+    /// `projectListLoadFailed` is `ProjectStore.loadFailed`. With the list
+    /// unknown, `projects` is empty, so the restore would keep no workspace
+    /// and the sweep would take every session for an orphan; the snapshot is
+    /// then held as unread (`WorkspaceStore.preserveForUnreadProjects`).
+    func restoreSelection(projects: [Project], projectListLoadFailed: Bool = false) {
         logger.info("restoreSelection: \(projects.count, privacy: .public) projects")
         hasRestoredSelection = true
         let loaded = workspaceStore.load()
+        if projectListLoadFailed {
+            logger.error("Project list did not load: keeping the workspace snapshot and every session")
+            workspaceStore.preserveForUnreadProjects()
+        }
         let valid = Set(projects.map(\.id))
         // Restore every project's snapshot — including layout-file projects.
         // The snapshot carries each pane's persisted zmx session identity, so
@@ -1795,7 +1808,7 @@ final class AppState {
             } else if let project = projects.first(where: { $0.id == id }) {
                 activeProjectID = id
                 recordProjectVisit(id)
-                ensureWorkspace(projectID: id, path: project.path)
+                ensureWorkspace(for: project)
                 // Reattaching remote panes need the zmx path before warm/render.
                 stampRemoteZmxPath(project)
                 acknowledgeActiveTab(projectID: id)
@@ -1887,7 +1900,7 @@ final class AppState {
         } else {
             window?.activeProjectID = project.id
             recordProjectVisit(project.id)
-            ensureWorkspace(projectID: project.id, path: project.path)
+            ensureWorkspace(for: project)
             stampRemoteZmxPath(project)
             // The window now selects a tab of this project, which another
             // window may own: its shadow comes from the reconcile, not from
@@ -1900,7 +1913,7 @@ final class AppState {
         logger.debug("selectProject: \(project.name, privacy: .public)")
         activeProjectID = project.id
         recordProjectVisit(project.id)
-        ensureWorkspace(projectID: project.id, path: project.path)
+        ensureWorkspace(for: project)
         // Stamp the remote zmx path onto every pane BEFORE any surface spawns
         // (warmFocusedProject / render → ensureNSView reads it). It's a host
         // property re-derived from the project on each open, not persisted.
@@ -2453,7 +2466,7 @@ final class AppState {
             Task { [zmx] in await zmx.reapOrphans(knownSessionNames: known) }
         }
         guard Preferences.shared.backgroundSSHConnections,
-              let remote = ProjectPath.remote(from: project.path),
+              let remote = project.path.flatMap(ProjectPath.remote),
               case let .remote(user, host, _) = remote
         else { return }
         let destination = RemoteSpawn.destination(user: user, host: host)
@@ -2549,6 +2562,10 @@ final class AppState {
               // Remote projects (#104): the reported pwd is a REMOTE
               // directory — adopting it would corrupt the project's identity.
               !project.isRemote,
+              // A project without a folder keeps none: its first shell sits
+              // in home, which must never become its path, and its layout
+              // matches by ID only.
+              project.path != nil,
               let pane = focusedPane(for: projectID),
               let pwd = pane.nsView?.currentPwd,
               !pwd.isEmpty
@@ -2815,7 +2832,8 @@ final class AppState {
             return nil
         }
         // The cwd is user-selectable, but zmx session grouping remains project-scoped.
-        let projectSessionSlug = (projectDirectory as NSString).lastPathComponent
+        let projectSessionSlug = projects.first(where: { $0.id == projectID })?.sessionSlug
+            ?? (projectDirectory as NSString).lastPathComponent
         return createTab(
             projectID: projectID,
             projectPath: workingDirectory,
@@ -2827,10 +2845,10 @@ final class AppState {
         )
     }
 
-    /// Returns the configured project root, including the synthetic pinned workspace fallback.
+    /// Returns the terminal root. Projects without a folder and pinned tabs use home.
     func configuredProjectDirectory(projectID: UUID, projects: [Project]) -> String? {
         if projectID == PinnedTabs.projectID { return PinnedTabs.fallbackRoot }
-        return projects.first(where: { $0.id == projectID })?.path
+        return projects.first(where: { $0.id == projectID })?.defaultDirectory
     }
 
     /// The teardown half of `closeTab`, without the workspace save — so a
@@ -2919,6 +2937,7 @@ final class AppState {
         from sourceProjectID: UUID,
         to destProjectID: UUID,
         destPath: String,
+        destSessionSlug: String? = nil,
         toIndex: Int? = nil
     ) {
         guard sourceProjectID != destProjectID else { return }
@@ -2946,7 +2965,7 @@ final class AppState {
         logger.debug(
             "moveTab: \(tabID, privacy: .public) from=\(sourceProjectID, privacy: .public) to=\(destProjectID, privacy: .public)"
         )
-        ensureWorkspace(projectID: destProjectID, path: destPath)
+        ensureWorkspace(projectID: destProjectID, path: destPath, sessionSlug: destSessionSlug)
         guard let dest = workspaces[destProjectID] else { return }
         source.closeTab(tabID)
         dest.adoptTab(tab, at: toIndex)
@@ -3059,14 +3078,20 @@ final class AppState {
     /// projects rebinds the pane's routing identity, mirroring `moveTab`.
     /// No-op when the pane isn't in any workspace or is its tab's only pane
     /// (already its own tab).
-    func separatePane(_ paneID: UUID, toProject destProjectID: UUID, destPath: String, at index: Int? = nil) {
+    func separatePane(
+        _ paneID: UUID,
+        toProject destProjectID: UUID,
+        destPath: String,
+        destSessionSlug: String? = nil,
+        at index: Int? = nil
+    ) {
         guard let (sourceProjectID, sourceTab) = locatePane(paneID),
               sourceTab.splitRoot.allPanes().count > 1,
               let pane = sourceTab.splitRoot.findPane(id: paneID)
         else { return }
         // Resolve the destination before detaching, so a failure can't leave
         // the pane belonging to no tab.
-        ensureWorkspace(projectID: destProjectID, path: destPath)
+        ensureWorkspace(projectID: destProjectID, path: destPath, sessionSlug: destSessionSlug)
         guard let dest = workspaces[destProjectID],
               let remaining = sourceTab.splitRoot.removing(paneID: paneID)
         else { return }
@@ -3360,7 +3385,7 @@ final class AppState {
         let beforeTabID = workspaces[project.id]?.activeTabID
 
         activeProjectID = project.id
-        ensureWorkspace(projectID: project.id, path: project.path)
+        ensureWorkspace(for: project)
         let didAcknowledgeCompletion = workspaces[project.id]?.selectTab(entry.tabID) ?? false
         if activeProjectID != beforeProjectID
             || workspaces[project.id]?.activeTabID != beforeTabID
@@ -3744,11 +3769,12 @@ final class AppState {
         let layout: LayoutFile
         do {
             guard let file = try projectFiles.loadFull(
-                forProjectPath: project.path,
+                for: ProjectFileIdentity(project),
                 preferredSlug: ProjectSlug.slug(from: project.name)
             )
             else {
-                return LayoutFileError.noProjectFile(projectPath: project.path)
+                return project.path.map { LayoutFileError.noProjectFile(projectPath: $0) }
+                    ?? LayoutFileError.noFolderlessProjectFile(projectName: project.name)
             }
             guard let bridged = file.layoutFile else {
                 return LayoutFileError.noTabs
@@ -3761,8 +3787,9 @@ final class AppState {
         let plan = LayoutReconciler.plan(
             layout: layout,
             workspace: workspaces[project.id],
-            projectRoot: project.path,
-            projectID: project.id
+            projectRoot: project.defaultDirectory,
+            projectID: project.id,
+            sessionSlug: project.sessionSlug
         )
         let planDesc = "tabs=\(plan.tabs.count) destroy=\(plan.panesToDestroy.count) closeTabs=\(plan.tabsToClose.count)"
         logger.info("applyLayout plan: \(planDesc, privacy: .public)")
@@ -3825,9 +3852,15 @@ final class AppState {
         let ownSlug = ProjectSlug.slug(from: project.name)
         let reservedSlugs = sameDirectorySiblingSlugs(of: project, in: siblingProjects).subtracting([ownSlug])
         do {
-            let layout = LayoutSerializer.layout(for: ws, projectName: project.name, projectRoot: project.path)
+            let layout = LayoutSerializer.layout(for: ws, projectName: project.name, projectRoot: project.defaultDirectory)
             let target = try projectFiles.write(
-                ProjectFile(name: project.name, path: project.path, zmxPath: project.zmxPath, tabs: layout.tabs),
+                ProjectFile(
+                    name: project.name,
+                    id: project.path == nil ? project.id : nil,
+                    path: project.path,
+                    zmxPath: project.zmxPath,
+                    tabs: layout.tabs
+                ),
                 projectName: project.name,
                 reservedSlugs: reservedSlugs
             )
@@ -3896,7 +3929,7 @@ final class AppState {
         host: DialogHost
     ) -> Bool {
         let siblingSlugs = sameDirectorySiblingSlugs(of: project, in: siblingProjects)
-        let strays = projectFiles.matches(forProjectPath: project.path).filter { file in
+        let strays = projectFiles.matches(for: ProjectFileIdentity(project)).filter { file in
             let name = file.url.lastPathComponent
             // The file we just wrote is not in conflict with itself, and a
             // sibling project's own file is expected, not a stray.
@@ -4299,7 +4332,12 @@ final class AppState {
 
     // MARK: - Private
 
-    private func ensureWorkspace(projectID: UUID, path: String) {
+    private func ensureWorkspace(for project: Project) {
+        ensureWorkspace(projectID: project.id, path: project.defaultDirectory, sessionSlug: project.sessionSlug)
+    }
+
+    /// `sessionSlug` names the sessions of the default tab (`Project.sessionSlug`).
+    private func ensureWorkspace(projectID: UUID, path: String, sessionSlug: String?) {
         // The pinned workspace starts EMPTY — the path-taking init spawns an
         // initial tab, which nobody pinned.
         if projectID == PinnedTabs.projectID {
@@ -4307,7 +4345,7 @@ final class AppState {
             return
         }
         if workspaces[projectID] == nil {
-            workspaces[projectID] = Workspace(projectID: projectID, projectPath: path)
+            workspaces[projectID] = Workspace(projectID: projectID, projectPath: path, sessionSlug: sessionSlug)
         }
     }
 }
