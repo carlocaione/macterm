@@ -33,12 +33,12 @@ struct NewRemoteProjectSheet: View {
         return t.isEmpty ? nil : t
     }
 
-    /// A typed name the pinned workspace reserves: refused here like every
-    /// typed name (`PinnedTabs.reservesName`). An empty field falls back to
+    /// A typed name the pinned or the sessions workspace reserves: refused
+    /// here like every typed name (`ReservedProjectName`). An empty field falls back to
     /// the host, which nobody typed as a name, so `ProjectStore.create`
     /// suffixes that one instead.
     private var nameIsReserved: Bool {
-        PinnedTabs.reservesName(name)
+        ReservedProjectName.isReserved(name)
     }
 
     var body: some View {
@@ -53,7 +53,7 @@ struct NewRemoteProjectSheet: View {
             }
             .textFieldStyle(.roundedBorder)
             if nameIsReserved {
-                Text(PinnedTabs.reservedNameMessage)
+                Text(ReservedProjectName.message(for: name))
                     .font(.caption)
                     .foregroundStyle(MactermTheme.warning)
                     .fixedSize(horizontal: false, vertical: true)

@@ -298,6 +298,7 @@ struct SidebarContent: View {
                     }
                 }
             }
+            sessionsSection
             ForEach(Array(projectStore.projects.enumerated()), id: \.element.id) { projectIndex, project in
                 projectSection(index: projectIndex, project: project)
             }
@@ -410,7 +411,7 @@ struct SidebarContent: View {
                 // Loaded → select; unloaded → restore from declaration.
                 appState.selectPinnedTab(tabID)
             case let .tab(projectID, tabID):
-                if let project = projectStore.projects.first(where: { $0.id == projectID }) {
+                if let project = tabOwner(projectID) {
                     appState.selectProject(project, in: windowState)
                     appState.selectTab(tabID, projectID: projectID, in: windowState)
                 }
@@ -450,6 +451,46 @@ struct SidebarContent: View {
         guard let project = appState.openProjects(atPaths: paths, store: projectStore, in: windowState) else { return }
         windowState.expandedProjects.insert(project.id)
         presentation.scrollPosition = .project(project.id)
+    }
+
+    // MARK: - Sessions
+
+    /// The tabs without a project, between the pinned rows and the projects,
+    /// under a native section header. Drawn only while a session exists: the
+    /// windows leave the workspace when its last tab goes
+    /// (`AppState.leaveEmptySessions`). A session row is a project tab row
+    /// of the synthetic project, and drops land through the ForEach's
+    /// insertion line, as in a project's tab list (rows carry no destination
+    /// of their own — see `tabRow`). Move to Sessions in a tab's menu is the
+    /// way in while the section is not there.
+    @ViewBuilder
+    private var sessionsSection: some View {
+        if let sessions = appState.sessionWorkspace, !sessions.tabs.isEmpty {
+            Section {
+                ForEach(Array(sessions.tabs.enumerated()), id: \.element.id) { index, tab in
+                    tabRow(tab: tab, index: index, project: SessionTabs.project)
+                }
+                .dropDestination(for: TabSlotDropItem.self) { items, offset in
+                    for item in items {
+                        switch item {
+                        case let .tab(tab):
+                            receiveTabDrop([tab], into: SessionTabs.project, at: offset)
+                        case let .pane(pane):
+                            receivePaneDrop([pane], into: SessionTabs.project, at: offset)
+                        }
+                    }
+                }
+            } header: {
+                Text(SessionTabs.sectionTitle)
+            }
+        }
+    }
+
+    /// The project that owns a tab row: a `ProjectStore` row, or the
+    /// synthetic project of the sessions. Pinned rows have their own paths.
+    private func tabOwner(_ projectID: UUID) -> Project? {
+        if projectID == SessionTabs.projectID { return SessionTabs.project }
+        return projectStore.projects.first { $0.id == projectID }
     }
 
     // MARK: - Pinned rows
@@ -651,6 +692,9 @@ struct SidebarContent: View {
         var items: [SidebarItem] = appState.pinnedRecords.map {
             .tab(projectID: PinnedTabs.projectID, tabID: $0.id)
         }
+        items.append(contentsOf: (appState.sessionWorkspace?.tabs ?? []).map {
+            .tab(projectID: SessionTabs.projectID, tabID: $0.id)
+        })
         for project in projectStore.projects {
             items.append(.project(project.id))
             guard windowState.expandedProjects.contains(project.id) else { continue }
@@ -763,7 +807,7 @@ struct SidebarContent: View {
                     pinnedTabMenu(record: record)
                 }
             case let .tab(projectID, tabID):
-                if let project = projectStore.projects.first(where: { $0.id == projectID }),
+                if let project = tabOwner(projectID),
                    let tab = appState.workspaces[projectID]?.tabs.first(where: { $0.id == tabID })
                 {
                     tabMenu(project: project, tab: tab)
@@ -776,6 +820,7 @@ struct SidebarContent: View {
                 Button("Local Folder…") { openProject() }
                 Button("Remote Machine…") { windowState.isNewRemoteProjectSheetPresented = true }
             }
+            Button("New Session") { appState.createSession(projects: projectStore.projects) }
         }
     }
 
@@ -885,6 +930,20 @@ struct SidebarContent: View {
             appState.reorderPinnedTab(record.id, toIndex: index + 2)
         }
         .disabled(index >= appState.pinnedRecords.count - 1)
+        // A remote tab stays out of the sessions (`canMoveIntoSessions`).
+        if isLoaded,
+           let tab = appState.pinnedWorkspace?.tabs.first(where: { $0.id == record.id }),
+           appState.canMoveIntoSessions(tab.splitRoot.allPanes())
+        {
+            Button("Unpin to Sessions") {
+                appState.moveTab(
+                    record.id,
+                    from: PinnedTabs.projectID,
+                    to: SessionTabs.projectID,
+                    destPath: SessionTabs.fallbackRoot
+                )
+            }
+        }
         if isLoaded, !projectStore.projects.isEmpty {
             Menu("Unpin to Project") {
                 ForEach(projectStore.projects) { destination in
@@ -955,6 +1014,16 @@ struct SidebarContent: View {
                         windowState.expandedProjects.insert(destination.id)
                     }
                 }
+            }
+        }
+        if project.id != SessionTabs.projectID, appState.canMoveIntoSessions(tab.splitRoot.allPanes()) {
+            Button("Move to Sessions") {
+                appState.moveTab(
+                    tab.id,
+                    from: project.id,
+                    to: SessionTabs.projectID,
+                    destPath: SessionTabs.fallbackRoot
+                )
             }
         }
         Button("Pin Tab") {

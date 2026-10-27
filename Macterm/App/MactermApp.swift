@@ -111,6 +111,7 @@ struct MactermApp: App {
                 }
                 Divider()
                 AppCommandMenuItem(command: .newTab, appState: appState, projectStore: projectStore, titleOverride: "New Tab")
+                AppCommandMenuItem(command: .newSession, appState: appState, projectStore: projectStore)
                 AppCommandMenuItem(command: .openProject, appState: appState, projectStore: projectStore, titleOverride: "Open Project…")
                 AppCommandMenuItem(
                     command: .newFolderlessProject,
@@ -913,9 +914,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         for ws in appState?.workspaces.values ?? [:].values {
             let project = projectsByID[ws.projectID]
-            let projectName = ws.projectID == PinnedTabs.projectID
-                ? PinnedTabs.displayName
-                : (project?.name ?? String(localized: "Project"))
+            let projectName = switch ws.projectID {
+            case PinnedTabs.projectID: PinnedTabs.displayName
+            case SessionTabs.projectID: SessionTabs.sectionTitle
+            default: project?.name ?? String(localized: "Project")
+            }
             for tab in ws.tabs {
                 for pane in tab.splitRoot.allPanes() where pane.needsConfirmClose {
                     // The adaptive poll may be slow or fully paused here (e.g.

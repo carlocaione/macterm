@@ -48,8 +48,8 @@ struct NewMactermProjectIntent: AppIntent {
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         // A typed name is refused like the CLI's `--name`; the folder's own
         // name is `ProjectStore.create`'s to disambiguate.
-        if let trimmed, PinnedTabs.reservesName(trimmed) {
-            throw MactermIntentError.badInput(PinnedTabs.reservedNameMessage)
+        if let trimmed, ReservedProjectName.isReserved(trimmed) {
+            throw MactermIntentError.badInput(ReservedProjectName.message(for: trimmed))
         }
         logger.info("intent: new project at \(path, privacy: .public)")
         let project = ctx.projectStore.create(
@@ -86,6 +86,11 @@ struct FocusMactermProjectIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let ctx = try await MactermIntentHost.shared.authorizedContext()
         let target = try IntentTargets.project(project.id, in: ctx)
+        // The sessions show only while a session exists; a window revealed
+        // onto an empty one would show nothing.
+        if target.id == SessionTabs.projectID, !ctx.appState.hasSessions {
+            throw MactermIntentError.notFound
+        }
         // `revealProject` fronts a window ALREADY showing it rather than
         // repointing whichever window happens to be key — the rule for
         // something that happens *to* a project rather than being chosen in a

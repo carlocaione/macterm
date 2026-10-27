@@ -11,6 +11,7 @@ final class HotkeyCaptureState {
 
 enum HotkeyAction: String, CaseIterable, Identifiable {
     case newTab = "new_tab"
+    case newSession = "new_session"
     case closePane = "close_pane"
     case closeTab = "close_tab"
     case splitRight = "split_right"
@@ -114,6 +115,9 @@ enum HotkeyAction: String, CaseIterable, Identifiable {
     var defaultShortcut: String {
         switch self {
         case .newTab: "cmd+t"
+        // Unbound by default: New Tab already opens a session in a window
+        // that shows no project.
+        case .newSession: "none"
         case .closePane: "cmd+w"
         // Unbound by default: cmd+w already closes the tab pane-by-pane, and
         // a whole-tab close on a stray chord ends every session in it (busy

@@ -130,7 +130,11 @@ final class ControlHandler {
 
     private func status() -> ControlData {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        let active = projectStore.projects.first { $0.id == appState.activeProjectID }
+        // The sessions are where a window with no project opens its tabs, so
+        // a script that asks where the user is gets them by name.
+        let active = appState.activeProjectID == SessionTabs.projectID
+            ? SessionTabs.project
+            : projectStore.projects.first { $0.id == appState.activeProjectID }
         return ControlData(status: ControlStatusInfo(
             version: version,
             pid: getpid(),
@@ -210,6 +214,7 @@ final class ControlHandler {
     private func windowProjectName(_ projectID: UUID?) -> String? {
         guard let projectID else { return nil }
         if projectID == PinnedTabs.projectID { return PinnedTabs.project.name }
+        if projectID == SessionTabs.projectID { return SessionTabs.project.name }
         return projectStore.projects.first { $0.id == projectID }?.name
     }
 
@@ -532,7 +537,7 @@ final class ControlHandler {
         let name = args.name?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let name {
             guard !name.isEmpty else { throw Self.emptyNameError }
-            guard !PinnedTabs.reservesName(name) else { throw Self.reservedNameError }
+            guard !ReservedProjectName.isReserved(name) else { throw Self.reservedNameError(for: name) }
         }
         let canonical: String?
         if let rawPath = args.path {
@@ -582,6 +587,15 @@ final class ControlHandler {
             // its own selection path.
             appState.selectPinnedProject()
         } else {
+            // The sessions section shows only while a session exists; a
+            // window selected onto an empty one would show nothing.
+            if project.id == SessionTabs.projectID, !appState.hasSessions {
+                throw ControlError(
+                    code: .notFound,
+                    message: "there are no sessions",
+                    action: "open one: `macterm tab new --project sessions`"
+                )
+            }
             // `--window` targets a specific one; without it the key window,
             // which is what a person at the keyboard means.
             try appState.selectProject(project, in: resolveWindow(args))
@@ -621,11 +635,15 @@ final class ControlHandler {
         guard project.id != PinnedTabs.projectID else {
             throw ControlError(code: .badRequest, message: "the pinned section cannot be renamed")
         }
-        // `resolveProject` matches the sentinel's display name BEFORE any user
-        // project's, so a project renamed to it becomes unreachable by name
-        // (UUID and index still work, but `--project Pinned` would silently
-        // target the pinned workspace instead). Refuse rather than strand it.
-        guard !PinnedTabs.reservesName(trimmed) else { throw Self.reservedNameError }
+        guard project.id != SessionTabs.projectID else {
+            throw ControlError(code: .badRequest, message: "the sessions section cannot be renamed")
+        }
+        // `resolveProject` matches the sentinels' display names BEFORE any
+        // user project's, so a project renamed to one becomes unreachable by
+        // name (UUID and index still work, but `--project Pinned` would
+        // silently target the pinned workspace instead). Refuse rather than
+        // strand it.
+        guard !ReservedProjectName.isReserved(trimmed) else { throw Self.reservedNameError(for: trimmed) }
         projectStore.rename(id: project.id, to: trimmed)
         guard let updated = projectStore.projects.first(where: { $0.id == project.id }) else {
             throw ControlError(code: .internalError, message: "project rename failed")
@@ -638,13 +656,14 @@ final class ControlHandler {
     private static let emptyNameError = ControlError(code: .badRequest, message: "project name cannot be empty")
 
     /// What `project.create` and `project.rename` say to a name
-    /// `PinnedTabs.reservesName` matches — worded like the app's own refusal
-    /// (`PinnedTabs.reservedNameMessage`), in the CLI's quoting.
-    private static let reservedNameError = ControlError(
-        code: .badRequest,
-        message: "\"\(PinnedTabs.displayName)\" is a reserved name for the pinned tabs",
-        action: "select another name"
-    )
+    /// `ReservedProjectName` matches — worded like the app's own refusal
+    /// (`ReservedProjectName.message(for:)`), in the CLI's quoting.
+    private static func reservedNameError(for name: String) -> ControlError {
+        let message = SessionTabs.reservesName(name)
+            ? "\"\(SessionTabs.displayName)\" is a reserved name for the tabs without a project"
+            : "\"\(PinnedTabs.displayName)\" is a reserved name for the pinned tabs"
+        return ControlError(code: .badRequest, message: message, action: "select another name")
+    }
 
     /// Drop a project's workspace and its `ProjectStore` entry — the same pair
     /// every in-app removal runs (sidebar row menu, bulk delete, palette,
@@ -668,6 +687,14 @@ final class ControlHandler {
         guard project.id != PinnedTabs.projectID else {
             throw ControlError(code: .badRequest, message: "the pinned section cannot be removed")
         }
+        // Each session closes on its own, as a tab: `tab close`.
+        guard project.id != SessionTabs.projectID else {
+            throw ControlError(
+                code: .badRequest,
+                message: "the sessions section cannot be removed",
+                action: "close each session with `macterm tab close`"
+            )
+        }
 
         // The same predicate `AppState.requestRemoveProject` evaluates before
         // it decides to stage its dialog, so the CLI refuses exactly when the
@@ -688,14 +715,24 @@ final class ControlHandler {
     // MARK: - Tab mutations
 
     private func tabNew(_ args: ControlArgs) throws -> ControlData {
-        let (project, workspace) = try resolveWorkspace(args)
-        guard let tabID = appState.createTab(
-            projectID: project.id,
-            projects: projectStore.projects,
-            command: args.run,
-            focus: args.focus ?? true
-        ),
-            let index = workspace.tabs.firstIndex(where: { $0.id == tabID })
+        let showsNoProject = appState.activeProjectID == nil
+        let (project, workspace) = try resolveWorkspace(args, opensSessionWithoutProject: true)
+        // A session opened for a window that showed no project is shown
+        // there, by the same path as New Tab in the app (`createSession`).
+        // `--no-focus` leaves the window alone.
+        let opensShownSession = showsNoProject && project.id == SessionTabs.projectID && args.focus ?? true
+        let created = if opensShownSession {
+            appState.createSession(projects: projectStore.projects, command: args.run)
+        } else {
+            appState.createTab(
+                projectID: project.id,
+                projects: projectStore.projects,
+                command: args.run,
+                focus: args.focus ?? true
+            )
+        }
+        guard let tabID = created,
+              let index = workspace.tabs.firstIndex(where: { $0.id == tabID })
         else {
             throw ControlError(code: .internalError, message: "tab creation failed")
         }
@@ -1308,7 +1345,7 @@ final class ControlHandler {
 
     private func layoutApply(_ args: ControlArgs) throws -> ControlData {
         let project = try resolveProject(args.project)
-        try rejectPinned(project, verb: "layout apply")
+        try rejectWorkspaceWithoutLayout(project, verb: "layout apply")
         if let error = appState.applyLayout(project: project) {
             throw ControlError(code: .notFound, message: EnglishErrorText.describe(error))
         }
@@ -1339,25 +1376,33 @@ final class ControlHandler {
 
     private func layoutSave(_ args: ControlArgs) throws -> ControlData {
         let project = try resolveProject(args.project)
-        try rejectPinned(project, verb: "layout save")
+        try rejectWorkspaceWithoutLayout(project, verb: "layout save")
         if let error = appState.saveLayout(project: project, siblingProjects: projectStore.projects) {
             throw ControlError(code: .internalError, message: EnglishErrorText.describe(error))
         }
         return ControlData()
     }
 
-    /// The layout verbs must never treat the SYNTHETIC pinned project as a
-    /// real one: `layout save` would write a project file declaring the home
-    /// directory (which Apply Layout on any home-rooted project would then
-    /// pick up), and `layout apply --force` would swap the pinned
-    /// workspace's tabs out from under the records.
-    private func rejectPinned(_ project: Project, verb: String) throws {
-        guard project.id == PinnedTabs.projectID else { return }
-        throw ControlError(
-            code: .badRequest,
-            message: "\(verb) does not apply to the pinned workspace. Macterm manages its layout by itself",
-            action: "edit ~/.config/macterm/pinned.yaml instead"
-        )
+    /// The layout verbs must never treat a SYNTHETIC project as a real one:
+    /// `layout save` would write a project file declaring the home directory
+    /// (which Apply Layout on any home-rooted project would then pick up),
+    /// and `layout apply --force` would swap the pinned workspace's tabs out
+    /// from under the records. Sessions have no declared layout at all.
+    private func rejectWorkspaceWithoutLayout(_ project: Project, verb: String) throws {
+        if project.id == PinnedTabs.projectID {
+            throw ControlError(
+                code: .badRequest,
+                message: "\(verb) does not apply to the pinned workspace. Macterm manages its layout by itself",
+                action: "edit ~/.config/macterm/pinned.yaml instead"
+            )
+        }
+        if project.id == SessionTabs.projectID {
+            throw ControlError(
+                code: .badRequest,
+                message: "\(verb) does not apply to the sessions. They have no layout file",
+                action: "move the tabs into a project first"
+            )
+        }
     }
 
     // MARK: - Selector resolution
@@ -1370,11 +1415,24 @@ final class ControlHandler {
     /// same way, answered `not_found` for as long as the user was looking at
     /// another project, which is exactly when a script or agent in a
     /// background pane is still working.
-    private func resolveWorkspace(_ args: ControlArgs) throws -> (Project, Workspace) {
+    ///
+    /// `opensSessionWithoutProject` is `tab new`'s: with no project active and
+    /// no selector, the tab opens as a session, as New Tab does in the app.
+    private func resolveWorkspace(
+        _ args: ControlArgs,
+        opensSessionWithoutProject: Bool = false
+    ) throws -> (Project, Workspace) {
         if args.project == nil, let session = args.session, !session.isEmpty {
             return try workspace(holding: session)
         }
-        let project = try resolveProject(args.project)
+        let project = if args.project == nil, opensSessionWithoutProject, appState.activeProjectID == nil {
+            SessionTabs.project
+        } else {
+            try resolveProject(args.project)
+        }
+        // The sessions workspace starts empty and exists as soon as anything
+        // asks for it, so `tab new --project sessions` opens the first one.
+        if project.id == SessionTabs.projectID { appState.ensureSessionWorkspace() }
         guard let workspace = appState.workspaces[project.id] else {
             throw ControlError(
                 code: .notFound,
@@ -1388,20 +1446,22 @@ final class ControlHandler {
     /// The project whose workspace has a pane on `session`. The active project
     /// is asked first, so a session it holds resolves exactly as it did before
     /// sessions were looked up everywhere; then the rest in sidebar order, and
-    /// the pinned workspace last.
+    /// the pinned and the sessions workspace last.
     private func workspace(holding session: String) throws -> (Project, Workspace) {
         let candidates = [appState.activeProjectID].compactMap(\.self)
             + projectStore.projects.map(\.id)
-            + [PinnedTabs.projectID]
+            + [PinnedTabs.projectID, SessionTabs.projectID]
         for projectID in candidates {
             guard let workspace = appState.workspaces[projectID],
                   workspace.tabs.contains(where: { tab in
                       tab.splitRoot.allPanes().contains { $0.sessionName == session }
                   })
             else { continue }
-            let project = projectID == PinnedTabs.projectID
-                ? PinnedTabs.project
-                : projectStore.projects.first { $0.id == projectID }
+            let project = switch projectID {
+            case PinnedTabs.projectID: PinnedTabs.project
+            case SessionTabs.projectID: SessionTabs.project
+            default: projectStore.projects.first { $0.id == projectID }
+            }
             if let project { return (project, workspace) }
         }
         throw ControlError(
@@ -1418,6 +1478,9 @@ final class ControlHandler {
             if appState.activeProjectID == PinnedTabs.projectID {
                 return PinnedTabs.project
             }
+            if appState.activeProjectID == SessionTabs.projectID {
+                return SessionTabs.project
+            }
             guard let active = projectStore.projects.first(where: { $0.id == appState.activeProjectID }) else {
                 throw ControlError(
                     code: .notFound,
@@ -1431,12 +1494,18 @@ final class ControlHandler {
         // workspace. Checked before the name lookup so a user project that
         // happens to be named "pinned" is still reachable by UUID/index.
         // Every naming path refuses or suffixes that name
-        // (`PinnedTabs.reservesName`, a superset of this test), so only a
-        // project named before that rule can be in this position.
+        // (`ReservedProjectName`, a superset of this test), so only a
+        // project named before that rule can be in this position. The same
+        // holds for `--project sessions`.
         if selector.lowercased() == PinnedTabs.displayName.lowercased()
             || selector == PinnedTabs.projectID.uuidString
         {
             return PinnedTabs.project
+        }
+        if selector.lowercased() == SessionTabs.displayName.lowercased()
+            || UUID(uuidString: selector) == SessionTabs.projectID
+        {
+            return SessionTabs.project
         }
         let projects = projectStore.projects
         if let id = UUID(uuidString: selector), let match = projects.first(where: { $0.id == id }) {

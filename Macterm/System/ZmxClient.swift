@@ -450,6 +450,10 @@ enum ZmxSessionName {
     /// Desktop widgets aren't projects either (`DesktopWidget`).
     static let desktopWidgetSlug = "widget"
 
+    /// Nor are the tabs without a project (`SessionTabs`). Without it, their
+    /// sessions took the name of the home folder that they start in.
+    static let sessionTabSlug = "session"
+
     static func make(projectName: String, paneSessionID: UUID) -> String {
         prefix + slug(projectName) + "-" + shortHex(paneSessionID)
     }

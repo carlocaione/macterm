@@ -1781,7 +1781,9 @@ final class AppState {
         // file's declared layout here would silently destroy them on every
         // launch. A declared layout is only ever applied by an explicit Apply
         // Layout; a project with no snapshot gets the default workspace.
-        for ws in WorkspaceSerializer.restore(from: loaded.workspaces, validIDs: valid) {
+        // The sessions workspace restores like a project's: the snapshot
+        // carries its tabs, and their panes reattach their zmx sessions.
+        for ws in WorkspaceSerializer.restore(from: loaded.workspaces, validIDs: valid.union([SessionTabs.projectID])) {
             workspaces[ws.projectID] = ws
         }
         // Pinned tabs: records first, then the launch reconcile against
@@ -1804,6 +1806,12 @@ final class AppState {
                 if !pinnedRecords.isEmpty {
                     ensurePinnedWorkspace()
                     activeProjectID = id
+                }
+            } else if id == SessionTabs.projectID {
+                if hasSessions {
+                    activeProjectID = id
+                    acknowledgeActiveTab(projectID: id)
+                    warmFocusedProject()
                 }
             } else if let project = projects.first(where: { $0.id == id }) {
                 activeProjectID = id
@@ -1838,6 +1846,7 @@ final class AppState {
     }
 
     func saveWorkspaces() {
+        leaveEmptySessions()
         // Every structural mutation ends here, so it is also where the
         // windows' views follow the workspace (a shadow of a closed tab is
         // dropped, ownership of a moved one settles).
@@ -2531,16 +2540,17 @@ final class AppState {
     }
 
     /// Rename a project from its sidebar row (the inline edit, which Rename
-    /// Current Project opens too). A name the pinned workspace reserves is
-    /// refused with a notice and the old name stays — as `project rename`
-    /// refuses it with a `bad_request`. The field has closed by the time the
-    /// name arrives, so the notice is the one place left to say why.
+    /// Current Project opens too). A name that the pinned or the sessions
+    /// workspace reserves is refused with a notice and the old name stays —
+    /// as `project rename` refuses it with a `bad_request`. The field has
+    /// closed by the time the name arrives, so the notice is the one place
+    /// left to say why.
     func renameProject(_ projectID: UUID, to name: String, store: ProjectStore) {
-        guard !PinnedTabs.reservesName(name) else {
+        guard !ReservedProjectName.isReserved(name) else {
             present(.notice(
                 .reservedProjectName,
                 title: String(localized: "Cannot rename project"),
-                message: PinnedTabs.reservedNameMessage,
+                message: ReservedProjectName.message(for: name),
                 host: .mainWindow
             ))
             return
@@ -2591,7 +2601,8 @@ final class AppState {
     func unloadProject(_ projectID: UUID) {
         // The pinned workspace is never unloaded wholesale — pinned tabs are
         // the durable thing; a tab only unloads when its own sessions die.
-        guard projectID != PinnedTabs.projectID else { return }
+        // Sessions have nothing to unload into: a closed session is gone.
+        guard projectID != PinnedTabs.projectID, projectID != SessionTabs.projectID else { return }
         guard let ws = workspaces[projectID] else { return }
         logger.debug("unloadProject: \(projectID, privacy: .public)")
         let snapshot = WorkspaceSerializer.snapshot([projectID: ws])
@@ -2630,6 +2641,20 @@ final class AppState {
         reconcileWindowViews()
     }
 
+    /// The sessions section shows only while a session exists, so the windows
+    /// that showed it leave it when its last tab goes — a close, a shell that
+    /// exits, a move or a merge out, a pin. They show no project then, where
+    /// New Tab opens the next session. Every one of those paths ends in
+    /// `saveWorkspaces`, which calls this first.
+    private func leaveEmptySessions() {
+        guard workspaces[SessionTabs.projectID]?.tabs.isEmpty == true,
+              activeProjectID == SessionTabs.projectID
+              || windows.contains(where: { $0.activeProjectID == SessionTabs.projectID })
+        else { return }
+        logger.debug("leaveEmptySessions: the last session closed")
+        vacateWindows(showing: SessionTabs.projectID)
+    }
+
     /// Whether the project retains the unloaded layout from `unloadProject`.
     /// Background creation may have started individual tabs since then; the
     /// marker stays until selection loads the rest. Use `isTabUnloaded` for rows.
@@ -2650,9 +2675,10 @@ final class AppState {
     /// a bulk removal can persist once for the whole batch instead of
     /// re-serializing the snapshot per item.
     private func removeProjectWithoutSaving(_ projectID: UUID) {
-        // Unreachable through the UI (the sentinel is not a Project) — hard
-        // guard so no future caller can tear the pinned workspace down.
-        guard projectID != PinnedTabs.projectID else { return }
+        // Unreachable through the UI (the sentinels are not Projects) — hard
+        // guard so no future caller can tear the pinned or the sessions
+        // workspace down.
+        guard projectID != PinnedTabs.projectID, projectID != SessionTabs.projectID else { return }
         logger.debug("removeProject: \(projectID, privacy: .public)")
         if let ws = workspaces[projectID] {
             // Project removed for good → its sessions die with it, unless a
@@ -2772,8 +2798,12 @@ final class AppState {
         focus: Bool = true
     ) -> UUID? {
         guard let ws = workspaces[projectID] else { return nil }
+        // Every new session groups under one slug, whatever the folder that
+        // it starts in (`ZmxSessionName.sessionTabSlug`).
         let tab = ws.createTab(
-            projectPath: projectPath, sessionSlug: sessionSlug, remoteZmxPath: remoteZmxPath,
+            projectPath: projectPath,
+            sessionSlug: projectID == SessionTabs.projectID ? ZmxSessionName.sessionTabSlug : sessionSlug,
+            remoteZmxPath: remoteZmxPath,
             command: command, env: env, focus: focus
         )
         if !focus {
@@ -2847,6 +2877,7 @@ final class AppState {
 
     /// Returns the terminal root. Projects without a folder and pinned tabs use home.
     func configuredProjectDirectory(projectID: UUID, projects: [Project]) -> String? {
+        if projectID == SessionTabs.projectID { return SessionTabs.fallbackRoot }
         if projectID == PinnedTabs.projectID { return PinnedTabs.fallbackRoot }
         return projects.first(where: { $0.id == projectID })?.defaultDirectory
     }
@@ -2962,6 +2993,10 @@ final class AppState {
         guard let source = workspaces[sourceProjectID],
               let tab = source.tabs.first(where: { $0.id == tabID })
         else { return }
+        if destProjectID == SessionTabs.projectID, !canMoveIntoSessions(tab.splitRoot.allPanes()) {
+            refuseRemoteMoveIntoSessions()
+            return
+        }
         logger.debug(
             "moveTab: \(tabID, privacy: .public) from=\(sourceProjectID, privacy: .public) to=\(destProjectID, privacy: .public)"
         )
@@ -2982,9 +3017,20 @@ final class AppState {
         if sourceProjectID == PinnedTabs.projectID {
             removePinnedRecord(forTab: tabID)
         }
-        activeProjectID = destProjectID
+        landOnTab(tabID, in: destProjectID)
         recordProjectVisit(destProjectID)
         saveWorkspaces()
+    }
+
+    /// Make `projectID` active with `tabID` on screen in the key window,
+    /// after a move put the tab there. Setting `activeProjectID` moves the key
+    /// window, and its alignment (`alignKeyWindowTab`) prefers the tab that
+    /// the window remembers for that workspace. Without the selection after
+    /// it, a window that showed the destination before showed its old tab,
+    /// and the moved tab stayed behind it.
+    func landOnTab(_ tabID: UUID, in projectID: UUID) {
+        activeProjectID = projectID
+        workspaces[projectID]?.selectTab(tabID)
     }
 
     /// Merge a tab into the destination project's ACTIVE tab at a resolved
@@ -2997,6 +3043,13 @@ final class AppState {
         at target: TabDropResolution.Target,
         inProject destProjectID: UUID
     ) {
+        if destProjectID == SessionTabs.projectID,
+           let source = workspaces[sourceProjectID]?.tabs.first(where: { $0.id == tabID }),
+           !canMoveIntoSessions(source.splitRoot.allPanes())
+        {
+            refuseRemoteMoveIntoSessions()
+            return
+        }
         guard let destTab = workspaces[destProjectID]?.activeTab,
               destTab.id != tabID,
               let sourceTab = detachTabForMerge(tabID, from: sourceProjectID, to: destProjectID)
@@ -3089,6 +3142,10 @@ final class AppState {
               sourceTab.splitRoot.allPanes().count > 1,
               let pane = sourceTab.splitRoot.findPane(id: paneID)
         else { return }
+        if destProjectID == SessionTabs.projectID, !canMoveIntoSessions([pane]) {
+            refuseRemoteMoveIntoSessions()
+            return
+        }
         // Resolve the destination before detaching, so a failure can't leave
         // the pane belonging to no tab.
         ensureWorkspace(projectID: destProjectID, path: destPath, sessionSlug: destSessionSlug)
@@ -3113,7 +3170,7 @@ final class AppState {
         }
         let newTab = TerminalTab(id: UUID(), splitRoot: .pane(pane), focusedPaneID: pane.id)
         dest.adoptTab(newTab, at: index)
-        activeProjectID = destProjectID
+        landOnTab(newTab.id, in: destProjectID)
         recordProjectVisit(destProjectID)
         saveWorkspaces()
     }
@@ -3360,10 +3417,14 @@ final class AppState {
         // RECORD order — unloaded records included, so keyboard cycling can
         // land on (and restore) a dead pinned tab exactly like clicking it.
         let pinnedEntries: [(projectID: UUID, tabID: UUID)] = pinnedRecords.map { (PinnedTabs.projectID, $0.id) }
+        // Then the sessions, which the sidebar draws between the two.
+        let sessionEntries: [(projectID: UUID, tabID: UUID)] = (sessionWorkspace?.tabs ?? []).map {
+            (SessionTabs.projectID, $0.id)
+        }
         let projectEntries: [(projectID: UUID, tabID: UUID)] = projects.flatMap { p in
             (workspaces[p.id]?.tabs ?? []).map { (p.id, $0.id) }
         }
-        let allTabs = pinnedEntries + projectEntries
+        let allTabs = pinnedEntries + sessionEntries + projectEntries
         guard !allTabs.isEmpty else { return }
 
         let currentTabID = activeProjectID.flatMap { pid in workspaces[pid]?.activeTabID }
@@ -3380,7 +3441,10 @@ final class AppState {
             selectPinnedTab(entry.tabID)
             return
         }
-        guard let project = projects.first(where: { $0.id == entry.projectID }) else { return }
+        let project = entry.projectID == SessionTabs.projectID
+            ? SessionTabs.project
+            : projects.first(where: { $0.id == entry.projectID })
+        guard let project else { return }
         let beforeProjectID = activeProjectID
         let beforeTabID = workspaces[project.id]?.activeTabID
 
@@ -4236,11 +4300,14 @@ final class AppState {
         stepProject(-1, projects: projects)
     }
 
-    /// Project cycling treats the pinned workspace as a slot ABOVE the first
-    /// project (where the sidebar draws it) — without it, the keyboard could
-    /// enter the pinned section but never leave it.
+    /// Project cycling treats the pinned workspace and then the sessions as
+    /// slots ABOVE the first project (where the sidebar draws them) — without
+    /// them, the keyboard could enter those sections but never leave them.
     private func stepProject(_ step: Int, projects: [Project]) {
         var slots = projects.map(\.id)
+        if hasSessions {
+            slots.insert(SessionTabs.projectID, at: 0)
+        }
         if !pinnedRecords.isEmpty {
             slots.insert(PinnedTabs.projectID, at: 0)
         }
@@ -4250,6 +4317,8 @@ final class AppState {
         let target = slots[(i + step + slots.count) % slots.count]
         if target == PinnedTabs.projectID {
             selectPinnedProject()
+        } else if target == SessionTabs.projectID {
+            selectProject(SessionTabs.project)
         } else if let project = projects.first(where: { $0.id == target }) {
             selectProject(project)
         }
@@ -4342,6 +4411,11 @@ final class AppState {
         // initial tab, which nobody pinned.
         if projectID == PinnedTabs.projectID {
             ensurePinnedWorkspace()
+            return
+        }
+        // So does the sessions workspace: a session opens on request only.
+        if projectID == SessionTabs.projectID {
+            ensureSessionWorkspace()
             return
         }
         if workspaces[projectID] == nil {

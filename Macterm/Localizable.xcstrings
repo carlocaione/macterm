@@ -767,6 +767,22 @@
         }
       }
     },
+    "A remote tab cannot move into the sessions" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원격 탭은 세션으로 이동할 수 없습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "远程标签页无法移到会话"
+          }
+        }
+      }
+    },
     "A shortcut wants to run an action in %@. It can create projects and tabs. It can also type into your terminals." : {
       "localizations" : {
         "ko" : {
@@ -4865,6 +4881,22 @@
         }
       }
     },
+    "Move to Sessions" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세션으로 이동"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到会话"
+          }
+        }
+      }
+    },
     "Name" : {
       "localizations" : {
         "ko" : {
@@ -4993,6 +5025,22 @@
         }
       }
     },
+    "New Session" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로운 세션"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建会话"
+          }
+        }
+      }
+    },
     "New Tab" : {
       "localizations" : {
         "ko" : {
@@ -5053,6 +5101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建窗口"
+          }
+        }
+      }
+    },
+    "New session" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새로운 세션"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建会话"
           }
         }
       }
@@ -8335,6 +8399,23 @@
         }
       }
     },
+    "Sessions" : {
+      "comment" : "The sidebar section of the tabs without a project",
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세션"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话"
+          }
+        }
+      }
+    },
     "Set Project Path to Current Directory" : {
       "localizations" : {
         "ko" : {
@@ -10127,6 +10208,22 @@
         }
       }
     },
+    "Unpin to Sessions" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고정 해제하여 세션으로 이동"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定并移到会话"
+          }
+        }
+      }
+    },
     "Update" : {
       "localizations" : {
         "ko" : {
@@ -11099,6 +11196,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“%@”是固定的标签页的保留名称。请选择其他名称。"
+          }
+        }
+      }
+    },
+    "“%@” is a reserved name for the tabs without a project. Select another name." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”은(는) 프로젝트가 없는 탭에 예약된 이름입니다. 다른 이름을 선택하십시오."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”是没有项目的标签页的保留名称。请选择其他名称。"
           }
         }
       }

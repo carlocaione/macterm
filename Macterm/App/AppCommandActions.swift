@@ -21,8 +21,14 @@ extension AppCommand {
 
         switch self {
         case .newTab:
-            guard let projectID else { return nil }
+            // A window that shows no project opens a session (`SessionTabs`):
+            // a tab that needs no project.
+            guard let projectID else {
+                return { ctx.appState.createSession(projects: ctx.projectStore.projects) }
+            }
             return { ctx.appState.createTab(projectID: projectID, projects: ctx.projectStore.projects) }
+        case .newSession:
+            return { ctx.appState.createSession(projects: ctx.projectStore.projects) }
         case .closePane:
             guard let projectID else { return nil }
             return {
@@ -114,6 +120,8 @@ extension AppCommand {
             let destPath: String
             if projectID == PinnedTabs.projectID {
                 destPath = PinnedTabs.fallbackRoot
+            } else if projectID == SessionTabs.projectID {
+                destPath = SessionTabs.fallbackRoot
             } else if let current {
                 destPath = current.defaultDirectory
             } else {
@@ -240,13 +248,14 @@ extension AppCommand {
             }
         case .unloadProject:
             // The pinned workspace can't be unloaded (its tabs unload one by
-            // one, only when their own sessions die).
-            guard let projectID, projectID != PinnedTabs.projectID,
+            // one, only when their own sessions die), and the sessions have
+            // nothing to unload into.
+            guard let projectID, projectID != PinnedTabs.projectID, projectID != SessionTabs.projectID,
                   ctx.appState.isProjectLoaded(projectID)
             else { return nil }
             return { ctx.appState.requestUnloadProject(projectID) }
         case .removeProject:
-            guard let projectID, projectID != PinnedTabs.projectID else { return nil }
+            guard let projectID, projectID != PinnedTabs.projectID, projectID != SessionTabs.projectID else { return nil }
             return {
                 ctx.appState.requestRemoveProject(projectID) {
                     ctx.appState.removeProject(projectID)

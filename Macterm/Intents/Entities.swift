@@ -7,8 +7,9 @@ import Foundation
 ///
 /// Identity is `Project.id`, which `projects.json` persists — so a shortcut
 /// written against a project still names it after a relaunch, a rename, or a
-/// path change. The pinned workspace appears too, under its synthetic
-/// project, because tab and pane actions work there like anywhere else.
+/// path change. The pinned workspace and the sessions appear too, under
+/// their synthetic projects, because tab and pane actions work there like
+/// anywhere else.
 struct MactermProjectEntity: AppEntity {
     let id: UUID
 
@@ -41,23 +42,36 @@ struct MactermProjectEntity: AppEntity {
         name = project.name
         path = project.path ?? ""
     }
+
+    /// The sessions, under their title in the app's language.
+    @MainActor
+    static var sessions: MactermProjectEntity {
+        var entity = MactermProjectEntity(SessionTabs.project)
+        entity.name = SessionTabs.sectionTitle
+        return entity
+    }
 }
 
 struct MactermProjectQuery: EntityStringQuery, EnumerableEntityQuery {
+    /// `withEmptySessions`: the sessions also while no session exists. The
+    /// picker offers them only while one does, but a saved shortcut names
+    /// them by their fixed id at any time, and New Tab there opens the first.
     @MainActor
-    private func all() async throws -> [MactermProjectEntity] {
+    private func all(withEmptySessions: Bool = false) async throws -> [MactermProjectEntity] {
         let ctx = try await MactermIntentHost.shared.context()
         // The pinned workspace is offered only once it exists — before that
         // there is nothing to address in it.
         let pinned = ctx.appState.workspaces[PinnedTabs.projectID] != nil
             ? [MactermProjectEntity(PinnedTabs.project)]
             : []
-        return pinned + ctx.projectStore.projects.map(MactermProjectEntity.init)
+        // The sessions likewise, while a session exists.
+        let sessions = ctx.appState.hasSessions || withEmptySessions ? [MactermProjectEntity.sessions] : []
+        return pinned + sessions + ctx.projectStore.projects.map(MactermProjectEntity.init)
     }
 
     @MainActor
     func entities(for identifiers: [UUID]) async throws -> [MactermProjectEntity] {
-        try await all().filter { identifiers.contains($0.id) }
+        try await all(withEmptySessions: true).filter { identifiers.contains($0.id) }
     }
 
     @MainActor
